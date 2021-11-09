@@ -15,6 +15,7 @@ import math
 import random
 from enum import Enum
 from time import sleep
+from pyransac3d import Plane
 
 
 xpts = []
@@ -51,6 +52,9 @@ def read_polaris():
     global xpts, ypts, zpts, collect_data
     fig = plt.figure()
     ax = plt.axes(projection='3d')
+    ax.axes.set_xlim3d(left=0.02, right=0.14)
+    ax.axes.set_ylim3d(bottom=-1.2, top=-0.7)
+    ax.axes.set_zlim3d(bottom=1.4, top=1.9)
 
     print("Created sub")
     rospy.init_node('read_polaris', anonymous=True)
@@ -82,15 +86,22 @@ def read_polaris():
     # init task
     cpos = (0, 0)
     crad = 0
+    trajectories = []
+    trajectory = None
+    dt = 0.05
+    t = 0.0
 
     task_state = TaskState.INTRO
     print(task_state)
 
-    calibration_points = []
-    q = None
     # Main loop
     running = True
     clock = pygame.time.Clock()
+
+    npts = np.array([])
+
+    is_init_circle = True
+
     while running:
         # print("OUTER", collect_data)
         if task_state == TaskState.INTRO:
@@ -107,60 +118,122 @@ def read_polaris():
                 plt.show()
 
         elif task_state == TaskState.CALIBRATE:
+            surf = None
             collect_data = True
             print(len(xpts))
-            if len(xpts) > 0:
-                print("Computing plane")
+            if len(xpts) > 3:
                 np_x = np.array(xpts)
                 np_y = np.array(ypts)
                 np_z = np.array(zpts)
-                pts = np.vstack([np_x, np_y, np_z])
+                pts = np.vstack([np_x, np_y, np_z]).T
+
+                xs = np.linspace(np.min(xpts), np.max(xpts), 100)
+                ys = np.linspace(np.min(zpts), np.max(zpts), 100)
+                X, Y = np.meshgrid(xs, ys)
+
+                if len(pts) > 0:
+                    plane_params, inliers = Plane().fit(pts, thresh=0.005, maxIteration=1000)
+                    if len(plane_params) > 0:
+                        a, b, c, d = plane_params
+                        Z = (d - a*X + b*Y) / c
+                        surf = ax.plot_surface(X, Y, Z)
+
+                if len(npts) > 10 and np.all(npts[-10:] == npts[-1]):
+                    task_state = TaskState.TASK
+                    print("Switching to TASK")
+                    cpos, crad = draw_init_circle(screen)
+                    trajectory = Trajectory(cpos, crad)
+                npts = np.append(npts, len(pts))
+
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                if surf is not None and task_state != TaskState.TASK:
+                    surf.remove()
+
+                ax.plot3D(pts.T[0], pts.T[1], pts.T[2], 'blue')
+
+                # Using SVD to find normal:
                 # subtract out the centroid and take the SVD
-                centroid = np.mean(pts, axis=1, keepdims=True)
-                print(centroid)
-                svd = np.linalg.svd(pts - centroid)
-                # Extract the left singular vectors
-                left = svd[0]
-                if len(left) > 0:
-                    normal = left[:,-1].astype(np.float64)
-                    # print(normal)
-                    centroid = centroid[:, 0].astype(np.float64)
-                    shifted = centroid + normal
-                    print(shifted)
-                    ax.plot3D(pts[0], pts[1], pts[2], 'blue')
-                    if q is not None:
-                        q.remove()
-                    q = ax.quiver(centroid[0], centroid[1], centroid[2],
-                            normal[0], normal[1], normal[2], length=0.2, normalize=True)
+                # centroid = np.mean(pts, axis=1, keepdims=True)
+                # print(centroid)
+                # svd = np.linalg.svd(pts - centroid)
+                # # Extract the left singular vectors
+                # left = svd[0]
+                # if len(left) > 0:
+                #     normal = left[:, -1].astype(np.float64)
+                #     # print(normal)
+                #     centroid = centroid[:, 0].astype(np.float64)
+                #     shifted = centroid + normal
+                #     print(shifted)
+                #     if q is not None:
+                #         q.remove()
+                #     q = ax.quiver(centroid[0], centroid[1], centroid[2],
+                #             normal[0], normal[1], normal[2], length=0.2, normalize=True)
                     # ax.plot3D(centroid[0], centroid[1], centroid[2], 'red')
-
-                    fig.canvas.draw()
-                    fig.canvas.flush_events()
-
-
-            done_calibration = False
-            if done_calibration:
-                task_state = TaskState.TASK
-                cpos, crad = draw_random_circle(screen, (255, 0, 0))
 
         elif task_state == TaskState.TASK:
             mx, my = pygame.mouse.get_pos()
             # print(dist(mx, my, cpos[0], cpos[1]))
             if dist(mx, my, cpos[0], cpos[1]) < crad:
-                print("Success")
-                cpos, crad = draw_random_circle(screen, (255, 255, 255))
+                if is_init_circle:
+                    print("Start")
+                    cpos, crad = draw_random_circle(screen, (255, 255, 255))
+                    is_init_circle = False
+                    sleep(2)
+                else:
+                    print("Success")
+                    cpos, crad = draw_init_circle(screen)
+                    is_init_circle = True
+                    t = 0.0
+
+            if not is_init_circle:
+                trajectories.append(trajectory)
+                trajectory = Trajectory(cpos, crad)
+
+                t += dt
+                tp = Timepoint(t, mx, my, 0)
+                tp.print()
+                trajectory.add_timepoint(tp)
+
         elif task_state == TaskState.SAVE:
             pass
 
         pygame.display.flip()
         pygame.display.update()
-        clock.tick(60)
-        #
+        clock.tick(int(1/dt))
         running = check_pygame_done()
 
 
+class Timepoint:
+    def __init__(self, t, x, y, z):
+        self.t = t
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def print(self):
+        print(f"{self.t:.2f}: ({self.x}, {self.y})")
+
+
+class Trajectory:
+    def __init__(self, cpos, crad):
+        self.cpos = cpos
+        self.crad = crad
+        self.data = []
+
+    def add_timepoint(self, tp):
+        self.data.append(tp)
+
+
+def draw_init_circle(screen, color=(255, 0, 0), bgcolor=(0, 0, 0)):
+    crad = 10
+    cpos = (10, screen.get_height()//2 - crad)
+    screen.fill(bgcolor)
+    pygame.draw.circle(screen, color, cpos, crad, 0)
+    return cpos, crad
+
 def draw_random_circle(screen, color, bgcolor=(0, 0, 0)):
-    crad = random.randint(20, 50)
+    crad = random.randint(10, 60)
     w, h = pygame.display.get_surface().get_size()
     cpos = (random.randint(crad, w - crad), random.randint(crad, h - crad))
     screen.fill(bgcolor)
