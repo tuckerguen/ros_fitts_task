@@ -16,12 +16,25 @@ import random
 from enum import Enum
 from time import sleep
 from pyransac3d import Plane
+import quaternion
 
+ws_lims = [[0,0],[0.33, 0.33]]
+screen_lims = [[0,0], [1920,1080]]
+xscl = 1920/0.33
+yscl = 1080/0.33
 
 xpts = []
 ypts = []
 zpts = []
 collect_data = False
+
+ws_origin = np.array([0.14147, 0.19254, -0.91928])
+table_plane_q = np.quaternion(-0.1662, 0.0399, 0.9594, 0.2239)
+R_ws_yz = quaternion.as_rotation_matrix(table_plane_q.inverse())
+T_ws_yz = np.zeros((4,4))
+T_ws_yz[:3, :3] = R_ws_yz
+T_ws_yz[3, 3] = 1
+T_ws_yz[:3, 3] = ws_origin
 
 TaskState = Enum("TaskState", "INTRO CALIBRATE TASK SAVE")
 
@@ -32,29 +45,25 @@ def polaris_targets_callback(pose_array):
     x = pose_array.poses[0].position.x
     y = pose_array.poses[0].position.y
     z = pose_array.poses[0].position.z
+    q = pose_array.poses[0].orientation
     # print(f"{x:.4f}", f"{y:4f}", f"{z:.4f}")
     if collect_data:
         xpts.append(x)
         ypts.append(y)
         zpts.append(z)
 
-    # ax.plot3D(xpts, ypts, zpts, 'blue')
-    pt = np.array([z, y, z])
-    length = 0.01
-    translated = pt + np.array([length, length, length])
-    # ax.quiver(x, y, z, rotated[0], rotated[1], rotated[2])
-    # ax.plot3D(x, y, z, 'blue')
-    # fig.canvas.draw()
-    # fig.canvas.flush_events()
-
 
 def read_polaris():
     global xpts, ypts, zpts, collect_data
     fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    ax.axes.set_xlim3d(left=0.02, right=0.14)
-    ax.axes.set_ylim3d(bottom=-1.2, top=-0.7)
-    ax.axes.set_zlim3d(bottom=1.4, top=1.9)
+    # ax = plt.axes(projection='3d')
+    # ax.set_xlabel("X")
+    # ax.set_ylabel("Y")
+    # ax.set_zlabel("Z")
+
+    # ax.axes.set_xlim3d(left=0.02, right=0.14)
+    # ax.axes.set_ylim3d(bottom=-1.2, top=-0.7)
+    # ax.axes.set_zlim3d(bottom=1.4, top=1.9)
 
     print("Created sub")
     rospy.init_node('read_polaris', anonymous=True)
@@ -113,78 +122,56 @@ def read_polaris():
                 # Add calibration text
                 text = [""]
                 # Move on
-                task_state = TaskState.CALIBRATE
+                task_state = TaskState.TASK
                 plt.ion()
                 plt.show()
 
         elif task_state == TaskState.CALIBRATE:
-            surf = None
+            # Set the initial origin and rotation matrices that are
+            # currently global
             collect_data = True
             print(len(xpts))
             if len(xpts) > 3:
                 np_x = np.array(xpts)
                 np_y = np.array(ypts)
                 np_z = np.array(zpts)
-                pts = np.vstack([np_x, np_y, np_z]).T
-
-                xs = np.linspace(np.min(xpts), np.max(xpts), 100)
-                ys = np.linspace(np.min(zpts), np.max(zpts), 100)
-                X, Y = np.meshgrid(xs, ys)
-
-                if len(pts) > 0:
-                    plane_params, inliers = Plane().fit(pts, thresh=0.005, maxIteration=1000)
-                    if len(plane_params) > 0:
-                        a, b, c, d = plane_params
-                        Z = (d - a*X + b*Y) / c
-                        surf = ax.plot_surface(X, Y, Z)
-
-                if len(npts) > 10 and np.all(npts[-10:] == npts[-1]):
-                    task_state = TaskState.TASK
-                    print("Switching to TASK")
-                    cpos, crad = draw_init_circle(screen)
-                    trajectory = Trajectory(cpos, crad)
-                npts = np.append(npts, len(pts))
+                pts = np.vstack([np_x, np_y, np_z, np.ones(np_x.shape[0])])
+                # Transform points from table plane to xy plane (relative to camera)
+                rot_pts = np.matmul(T_ws_yz, pts)
+                rot_pts = rot_pts[:3, :]
+                plt.plot(-rot_pts[2], rot_pts[1], 'blue')
 
                 fig.canvas.draw()
                 fig.canvas.flush_events()
-                if surf is not None and task_state != TaskState.TASK:
-                    surf.remove()
-
-                ax.plot3D(pts.T[0], pts.T[1], pts.T[2], 'blue')
-
-                # Using SVD to find normal:
-                # subtract out the centroid and take the SVD
-                # centroid = np.mean(pts, axis=1, keepdims=True)
-                # print(centroid)
-                # svd = np.linalg.svd(pts - centroid)
-                # # Extract the left singular vectors
-                # left = svd[0]
-                # if len(left) > 0:
-                #     normal = left[:, -1].astype(np.float64)
-                #     # print(normal)
-                #     centroid = centroid[:, 0].astype(np.float64)
-                #     shifted = centroid + normal
-                #     print(shifted)
-                #     if q is not None:
-                #         q.remove()
-                #     q = ax.quiver(centroid[0], centroid[1], centroid[2],
-                #             normal[0], normal[1], normal[2], length=0.2, normalize=True)
-                    # ax.plot3D(centroid[0], centroid[1], centroid[2], 'red')
 
         elif task_state == TaskState.TASK:
-            mx, my = pygame.mouse.get_pos()
-            # print(dist(mx, my, cpos[0], cpos[1]))
-            if dist(mx, my, cpos[0], cpos[1]) < crad:
-                if is_init_circle:
-                    print("Start")
-                    cpos, crad = draw_random_circle(screen, (255, 255, 255))
-                    is_init_circle = False
-                    sleep(2)
-                else:
-                    print("Success")
-                    cpos, crad = draw_init_circle(screen)
-                    is_init_circle = True
-                    t = 0.0
+            collect_data = True
+            if len(xpts) > 0:
+                pt = np.vstack([np.array(xpts[-1]), np.array(ypts[-1]), np.array(zpts[-1]), 1])
+                rot_pt = np.matmul(T_ws_yz, pt)
+                rot_pt = rot_pt[:3, :]
+                screenx = -rot_pt[2] * xscl
+                screeny = -rot_pt[1] * yscl
+                # plt.plot(-rot_pt[2], rot_pt[1], 'blue')
+                # Map to screen coordinates
+                print(rot_pt, screenx, screeny)
+                if not np.isnan(screeny) and not np.isnan(screeny):
+                    # pygame.mouse.set_pos([int(screenx), int(screeny)])
+                    pygame.draw.circle(screen, (0, 255, 0), [int(screenx), int(screeny)], 5, 0)
+
+                mx, my = pygame.mouse.get_pos()
+                # print(dist(mx, my, cpos[0], cpos[1]))
+                if dist(mx, my, cpos[0], cpos[1]) < crad:
+                    if is_init_circle:
+                        print("Start")
+                        cpos, crad = draw_random_circle(screen, (255, 255, 255))
+                        is_init_circle = False
+                        sleep(2)
+                    else:
+                        print("Success")
+                        cpos, crad = draw_init_circle(screen)
+                        is_init_circle = True
+                        t = 0.0
 
             if not is_init_circle:
                 trajectories.append(trajectory)
@@ -200,7 +187,7 @@ def read_polaris():
 
         pygame.display.flip()
         pygame.display.update()
-        clock.tick(int(1/dt))
+        clock.tick(100)
         running = check_pygame_done()
 
 
