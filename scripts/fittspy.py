@@ -157,8 +157,10 @@ def read_polaris():
                 print(rot_pt, screenx, screeny)
                 if not np.isnan(screeny) and not np.isnan(screeny):
                     # pygame.mouse.set_pos([int(screenx), int(screeny)])
+                    screen.fill(bgcolor)
                     pygame.draw.circle(screen, (0, 255, 0), [int(screenx), int(screeny)], 5, 0)
 
+                pygame.draw.circle(screen, (255, 255, 255), cpos, crad, 0)
                 mx, my = pygame.mouse.get_pos()
                 # print(dist(mx, my, cpos[0], cpos[1]))
                 if dist(mx, my, cpos[0], cpos[1]) < crad:
@@ -184,6 +186,7 @@ def read_polaris():
 
         elif task_state == TaskState.SAVE:
             pass
+
 
         pygame.display.flip()
         pygame.display.update()
