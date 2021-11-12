@@ -18,23 +18,23 @@ from time import sleep
 from pyransac3d import Plane
 import quaternion
 
-ws_lims = [[0,0],[0.33, 0.33]]
+ws_lims = [[0,0],[0.1143, 0.5334]]
 screen_lims = [[0,0], [1920,1080]]
-xscl = 1920/0.33
-yscl = 1080/0.33
+xscl = 1920/0.3683
+yscl = 1080/0.2286
 
 xpts = []
 ypts = []
 zpts = []
 collect_data = False
 
-ws_origin = np.array([0.14147, 0.19254, -0.91928])
-table_plane_q = np.quaternion(-0.1662, 0.0399, 0.9594, 0.2239)
+ws_origin = np.array([0.1217, 0.2804, -0.9552])
+table_plane_q = np.quaternion(0.0399, 0.1631, -0.2353, 0.9572)
 R_ws_yz = quaternion.as_rotation_matrix(table_plane_q.inverse())
 T_ws_yz = np.zeros((4,4))
 T_ws_yz[:3, :3] = R_ws_yz
 T_ws_yz[3, 3] = 1
-T_ws_yz[:3, 3] = ws_origin
+# T_ws_yz[:3, 3] = -ws_origin
 
 TaskState = Enum("TaskState", "INTRO CALIBRATE TASK SAVE")
 
@@ -123,8 +123,9 @@ def read_polaris():
                 text = [""]
                 # Move on
                 task_state = TaskState.TASK
-                plt.ion()
-                plt.show()
+                # plt.ion()
+                # plt.show()
+                cpos, crad = draw_random_circle(screen, (255, 255, 255))
 
         elif task_state == TaskState.CALIBRATE:
             # Set the initial origin and rotation matrices that are
@@ -135,11 +136,12 @@ def read_polaris():
                 np_x = np.array(xpts)
                 np_y = np.array(ypts)
                 np_z = np.array(zpts)
-                pts = np.vstack([np_x, np_y, np_z, np.ones(np_x.shape[0])])
+                pts = np.vstack([np_x-ws_origin[0], np_y-ws_origin[1], np_z-ws_origin[2], np.ones(np_x.shape[0])])
                 # Transform points from table plane to xy plane (relative to camera)
                 rot_pts = np.matmul(T_ws_yz, pts)
                 rot_pts = rot_pts[:3, :]
-                plt.plot(-rot_pts[2], rot_pts[1], 'blue')
+                print(rot_pts[:,0])
+                plt.plot(rot_pts[2], -rot_pts[1], 'blue')
 
                 fig.canvas.draw()
                 fig.canvas.flush_events()
@@ -147,11 +149,12 @@ def read_polaris():
         elif task_state == TaskState.TASK:
             collect_data = True
             if len(xpts) > 0:
-                pt = np.vstack([np.array(xpts[-1]), np.array(ypts[-1]), np.array(zpts[-1]), 1])
-                rot_pt = np.matmul(T_ws_yz, pt)
-                rot_pt = rot_pt[:3, :]
-                screenx = -rot_pt[2] * xscl
-                screeny = -rot_pt[1] * yscl
+                pts = np.vstack([xpts[-1] - ws_origin[0], ypts[-1] - ws_origin[1], zpts[-1] - ws_origin[2], 1])
+                # Transform points from table plane to xy plane (relative to camera)
+                rot_pts = np.matmul(T_ws_yz, pts)
+                rot_pt = rot_pts[:3, :]
+                screenx = rot_pt[2] * xscl
+                screeny = rot_pt[1] * yscl
                 # plt.plot(-rot_pt[2], rot_pt[1], 'blue')
                 # Map to screen coordinates
                 print(rot_pt, screenx, screeny)
@@ -160,20 +163,23 @@ def read_polaris():
                     screen.fill(bgcolor)
                     pygame.draw.circle(screen, (0, 255, 0), [int(screenx), int(screeny)], 5, 0)
 
-                pygame.draw.circle(screen, (255, 255, 255), cpos, crad, 0)
+                # pygame.draw.circle(screen, (255, 255, 255), cpos, crad, 0)
                 mx, my = pygame.mouse.get_pos()
                 # print(dist(mx, my, cpos[0], cpos[1]))
-                if dist(mx, my, cpos[0], cpos[1]) < crad:
+                if dist(screenx, screeny, cpos[0], cpos[1]) < crad:
                     if is_init_circle:
                         print("Start")
                         cpos, crad = draw_random_circle(screen, (255, 255, 255))
                         is_init_circle = False
-                        sleep(2)
                     else:
                         print("Success")
                         cpos, crad = draw_init_circle(screen)
                         is_init_circle = True
                         t = 0.0
+                if is_init_circle:
+                    pygame.draw.circle(screen, (255,0,0), cpos, crad, 0)
+                else:
+                    pygame.draw.circle(screen, (255, 255, 255), cpos, crad, 0)
 
             if not is_init_circle:
                 trajectories.append(trajectory)
