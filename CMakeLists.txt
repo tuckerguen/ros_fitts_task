@@ -163,6 +163,7 @@ add_executable(${PROJECT_NAME}_node src/fitts_task_node.cpp)
 ## in contrast to setup.py, you can choose the destination
  catkin_install_python(PROGRAMS
    scripts/fittspy.py
+   scripts/fitts_task_node.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 

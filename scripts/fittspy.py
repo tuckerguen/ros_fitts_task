@@ -36,8 +36,8 @@ T_ws_yz[:3, :3] = R_ws_yz
 T_ws_yz[3, 3] = 1
 # T_ws_yz[:3, 3] = -ws_origin
 
-TaskState = Enum("TaskState", "INTRO CALIBRATE TASK SAVE")
 
+TaskState = Enum("TaskState", "INTRO CALIBRATE TASK SAVE")
 
 # class Polaris:
 def polaris_targets_callback(pose_array):
@@ -56,14 +56,6 @@ def polaris_targets_callback(pose_array):
 def read_polaris():
     global xpts, ypts, zpts, collect_data
     fig = plt.figure()
-    # ax = plt.axes(projection='3d')
-    # ax.set_xlabel("X")
-    # ax.set_ylabel("Y")
-    # ax.set_zlabel("Z")
-
-    # ax.axes.set_xlim3d(left=0.02, right=0.14)
-    # ax.axes.set_ylim3d(bottom=-1.2, top=-0.7)
-    # ax.axes.set_zlim3d(bottom=1.4, top=1.9)
 
     print("Created sub")
     rospy.init_node('read_polaris', anonymous=True)
@@ -105,7 +97,7 @@ def read_polaris():
 
     # Main loop
     running = True
-    clock = pygame.time.Clock()
+
 
     npts = np.array([])
 
