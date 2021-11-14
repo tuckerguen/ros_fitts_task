@@ -1,8 +1,9 @@
 #!/home/tucker/anaconda3/bin/python3
-
+import os
 import sys
 import math
 import rospy
+import rospkg
 import pickle
 import pygame
 import random
@@ -110,20 +111,8 @@ class FittsTaskNode:
         pygame.draw.circle(self.screen, circle_color, self.circle_pos, self.circle_rad, 0)
 
         if len(self.pts) > 0:
-            pts = np.ones(4)
-            ws_origin = np.array([0.1217, 0.2804, -0.9552])
-            pts[:3] = self.pts[-1] - ws_origin
-            table_plane_q = np.quaternion(0.0399, 0.1631, -0.2353, 0.9572)
-            R_ws_yz = quaternion.as_rotation_matrix(table_plane_q.inverse())
-            T_ws_yz = np.zeros((4, 4))
-            T_ws_yz[:3, :3] = R_ws_yz
-            T_ws_yz[3, 3] = 1
-
-            rot_pt = np.matmul(T_ws_yz, pts)
-            xscl = 1920 / 0.3683
-            yscl = 1080 / 0.2286
-            screenx = rot_pt[2] * xscl
-            screeny = rot_pt[1] * yscl
+            # For testing purposes (aligned with bag files)
+            screenx, screeny = self._get_test_transformed_pt()
 
             # Compute the screen space point
             # pts = np.ones(4)
@@ -160,18 +149,39 @@ class FittsTaskNode:
                 if not self.is_init_circle:
                     print("Adding timepoint")
                     self.t += self.dt
+                    print(self.t)
                     tp = Timepoint(self.t, self.pointer[0], self.pointer[1])
                     tp.print()
                     self.trajectory.add_timepoint(tp)
 
     def save(self):
-        with open("./test_traj.pkl", 'wb') as f:
+        print("saving")
+        rospack = rospkg.RosPack()
+        pkl_path = os.path.join(rospack.get_path('fitts_task'), "trajectories", "test_traj.pkl")
+        with open(pkl_path, 'wb') as f:
             pickle.dump(self.trajectories, f)
         self.state = TaskState.EXIT
 
     def exit(self):
         pygame.quit()
         sys.exit(0)
+
+    def _get_test_transformed_pt(self):
+        pts = np.ones(4)
+        ws_origin = np.array([0.1217, 0.2804, -0.9552])
+        pts[:3] = self.pts[-1] - ws_origin
+        table_plane_q = np.quaternion(0.0399, 0.1631, -0.2353, 0.9572)
+        R_ws_yz = quaternion.as_rotation_matrix(table_plane_q.inverse())
+        T_ws_yz = np.zeros((4, 4))
+        T_ws_yz[:3, :3] = R_ws_yz
+        T_ws_yz[3, 3] = 1
+
+        rot_pt = np.matmul(T_ws_yz, pts)
+        xscl = 1920 / 0.3683
+        yscl = 1080 / 0.2286
+        screenx = rot_pt[2] * xscl
+        screeny = rot_pt[1] * yscl
+        return screenx, screeny
 
     def _draw_init_circle(self):
         self.screen.fill(self.background_color)
