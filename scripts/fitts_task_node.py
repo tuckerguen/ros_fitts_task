@@ -116,13 +116,15 @@ class FittsTaskNode:
 
             # Compute the screen space point
             # pts = np.ones(4)
-            # pts[:3] = self.pts[-1] - self.ws_origin
+            curr_pt = self.pts[-1]
+            # pts[:3] = curr_pt - self.ws_origin
             # screen_pt = np.matmul(self.T, pts)
             # screenx = screen_pt[2] * self.xscl
             # screeny = screen_pt[1] * self.yscl
             if not np.isnan(screenx) and not np.isnan(screeny):
                 self.pointer = (int(screenx), int(screeny)-70)
                 self.pointer = pygame.mouse.get_pos()
+
             # Draw user pointer
             pygame.draw.circle(self.screen, (0, 255, 0), [self.pointer[0], self.pointer[1]], 5, 0)
 
@@ -139,7 +141,7 @@ class FittsTaskNode:
                         self._draw_random_circle()
                         self.t = 0
                         self.trajectory = Trajectory(self.circle_pos, self.circle_rad)
-                        tp = Timepoint(self.t, self.pointer[0], self.pointer[1])
+                        tp = Timepoint(self.t, self.pointer[0], self.pointer[1], curr_pt)
                         self.trajectory.add_timepoint(tp)
                     else:
                         self.is_init_circle = True
@@ -150,7 +152,7 @@ class FittsTaskNode:
                     print("Adding timepoint")
                     self.t += self.dt
                     print(self.t)
-                    tp = Timepoint(self.t, self.pointer[0], self.pointer[1])
+                    tp = Timepoint(self.t, self.pointer[0], self.pointer[1], curr_pt)
                     tp.print()
                     self.trajectory.add_timepoint(tp)
 
@@ -235,13 +237,14 @@ class FittsTaskNode:
 
 
 class Timepoint:
-    def __init__(self, t, x, y):
+    def __init__(self, t, x, y, pt_3d):
         self.t = t
         self.x = x
         self.y = y
+        self.pt_3d = pt_3d
 
     def print(self):
-        print(f"{self.t:.2f}: ({self.x}, {self.y})")
+        print(f"{self.t:.2f}: ({self.x}, {self.y}), ({self.pt_3d[0]:0.3f}, {self.pt_3d[1]:0.3f}, {self.pt_3d[2]:0.3f})")
 
 
 class Trajectory:
@@ -252,6 +255,7 @@ class Trajectory:
 
     def add_timepoint(self, tp):
         self.data.append(tp)
+
 
 def main():
     node = FittsTaskNode(screen_size=(0.6858, 0.3556))
