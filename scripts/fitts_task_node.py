@@ -81,6 +81,13 @@ class FittsTaskNode:
             self.state = TaskState.CALIBRATE
 
     def calibrate_step(self):
+        """
+        With the marker placed at the origin of the workspace (world) coordinate frame, we collect
+        some data to create the camera to world matrix. We invert that and apply it to 3D points
+        collected from the camera in order to map those points to xy plane in camera space. Then, given
+        the known size of the workspace and the known size of the screen, we directly map those points
+        in the xy plane to the screen's pixel coordinates
+        """
         self.collect_data = True
         self.t += 1 / self.frame_rate
         if len(self.pts) > 0:
@@ -90,9 +97,13 @@ class FittsTaskNode:
                 # Construct the transformation matrix
                 self.ws_origin = np.mean(np.array(self.pts))
                 self.ws_q = np.mean(np.array(self.orientations))
-                R = quaternion.as_rotation_matrix(self.ws_q)
-                self.T[:3, :3] = R
+                # Camera to world
+                # Transform points from camera space to world space
+                # The world origin is the workspace origin, top left corner
+                R_WC = quaternion.as_rotation_matrix(self.ws_q)
+                self.T[:3, :3] = R_WC
                 self.T[3, 3] = 1
+                self.T[:, 3] = self.ws_origin
                 self.to_task()
         else:
             render_lines_of_text(self.screen, ["Cannot see marker"])
@@ -105,7 +116,7 @@ class FittsTaskNode:
         self.state = TaskState.TASK
 
     def task_step(self):
-        # Render correct circle every step
+        # Render circle every step
         self.screen.fill(self.background_color)
         circle_color = self.init_circle_color if self.is_init_circle else self.target_circle_color
         pygame.draw.circle(self.screen, circle_color, self.circle_pos, self.circle_rad, 0)
@@ -115,15 +126,18 @@ class FittsTaskNode:
             screenx, screeny = self._get_test_transformed_pt()
 
             # Compute the screen space point
-            # pts = np.ones(4)
-            curr_pt = self.pts[-1]
-            # pts[:3] = curr_pt - self.ws_origin
-            # screen_pt = np.matmul(self.T, pts)
-            # screenx = screen_pt[2] * self.xscl
-            # screeny = screen_pt[1] * self.yscl
+            # curr_pt = self.pts[-1]
+            # print(curr_pt)
+            # # pts[:3] = curr_pt - self.ws_origin
+            # ws_pt = np.matmul(self.T, curr_pt)[:3]
+            # print(ws_pt)
+            # # map value
+            # screenx = ws_pt[2] * self.xscl
+            # screeny = ws_pt[1] * self.yscl
+            print(screenx, screeny)
             if not np.isnan(screenx) and not np.isnan(screeny):
-                self.pointer = (int(screenx), int(screeny)-70)
-                self.pointer = pygame.mouse.get_pos()
+                self.pointer = (int(screenx), int(screeny))
+                # self.pointer = pygame.mouse.get_pos()
 
             # Draw user pointer
             pygame.draw.circle(self.screen, (0, 255, 0), [self.pointer[0], self.pointer[1]], 5, 0)
@@ -169,16 +183,17 @@ class FittsTaskNode:
         sys.exit(0)
 
     def _get_test_transformed_pt(self):
-        pts = np.ones(4)
+        pt = self.pts[-1]
         ws_origin = np.array([0.1217, 0.2804, -0.9552])
-        pts[:3] = self.pts[-1] - ws_origin
+        # pts[:3] = self.pts[-1] - ws_origin
         table_plane_q = np.quaternion(0.0399, 0.1631, -0.2353, 0.9572)
-        R_ws_yz = quaternion.as_rotation_matrix(table_plane_q.inverse())
+        R_ws_yz = quaternion.as_rotation_matrix(table_plane_q).T
         T_ws_yz = np.zeros((4, 4))
         T_ws_yz[:3, :3] = R_ws_yz
         T_ws_yz[3, 3] = 1
+        T_ws_yz[:3, 3] = np.matmul(-R_ws_yz, ws_origin.T)
 
-        rot_pt = np.matmul(T_ws_yz, pts)
+        rot_pt = np.matmul(T_ws_yz, pt)
         xscl = 1920 / 0.3683
         yscl = 1080 / 0.2286
         screenx = rot_pt[2] * xscl
@@ -227,7 +242,7 @@ class FittsTaskNode:
 
     def polaris_callback(self, pose_array):
         pos = pose_array.poses[0].position
-        position = np.array([pos.x, pos.y, pos.z])
+        position = np.array([pos.x, pos.y, pos.z, 1])
         q = pose_array.poses[0].orientation
         orientation = np.quaternion(q.w, q.x, q.y, q.z)
         if self.collect_data:
@@ -258,7 +273,8 @@ class Trajectory:
 
 
 def main():
-    node = FittsTaskNode(screen_size=(0.6858, 0.3556))
+    # node = FittsTaskNode(screen_size=(0.6858, 0.3556))  # Big monitor (27")
+    node = FittsTaskNode(screen_size=(0.505, 0.2805))  # Small monitor (21.5")
     while node.is_pygame_running():
         node.step()
 
