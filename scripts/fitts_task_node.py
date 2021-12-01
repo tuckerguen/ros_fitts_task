@@ -1,6 +1,7 @@
 #!/home/tucker/anaconda3/bin/python3
 import os
 import sys
+import time
 import math
 import rospy
 import rospkg
@@ -13,10 +14,12 @@ from enum import Enum
 from util import render_lines_of_text
 from geometry_msgs.msg import PoseArray
 
+DEBUG = True
+
 INTRO_TEXT = ["Performing the fitts task:",
               "1. Calibrate the motion capture",
-              "Place the motion tracker at the origin of the workspace"
-              "Press enter and wait until the system finds the origin"
+              "Place the motion tracker at the origin of the workspace",
+              "Press enter and wait until the system finds the origin",
               "2. Perform the task",
               "   A red circle will appear on the screen. Move the cursor to the red circle",
               "   Immediately after, a white circle will appear",
@@ -26,7 +29,9 @@ TaskState = Enum("TaskState", "INTRO CALIBRATE TASK SAVE EXIT")
 
 
 class FittsTaskNode:
-    def __init__(self, screen_size, n_trials=3, frame_rate=100, background_color=(0, 0, 0)):
+    def __init__(self, screen_size, n_trials=30, frame_rate=100, background_color=(0, 0, 0)):
+        self.delay_timer = 0
+
         self.pts = []
         self.orientations = []
         self.collect_data = False
@@ -45,7 +50,7 @@ class FittsTaskNode:
 
         self.circle_pos = (0, 0)
         self.circle_rad = 0
-        self.dt = 1/frame_rate
+        self.dt = 1 / frame_rate
         self.t = 0.0
         self.is_init_circle = True
         self.init_circle_color = (255, 0, 0)
@@ -61,6 +66,7 @@ class FittsTaskNode:
         self.yscl = self.screen_h / screen_size[1]
 
         self.trajectories = []
+        self.trajectory = None
 
     def step(self):
         # self.all_step_render()
@@ -94,20 +100,32 @@ class FittsTaskNode:
             self.screen.fill(self.background_color)
             render_lines_of_text(self.screen, [f"Calibrating for 5s. t={self.t:.3f}"])
             if self.t > 5:
-                # Construct the transformation matrix
-                self.ws_origin = np.mean(np.array(self.pts))
-                self.ws_q = np.mean(np.array(self.orientations))
-                # Camera to world
-                # Transform points from camera space to world space
-                # The world origin is the workspace origin, top left corner
-                R_WC = quaternion.as_rotation_matrix(self.ws_q)
-                self.T[:3, :3] = R_WC
-                self.T[3, 3] = 1
-                self.T[:, 3] = self.ws_origin
+                self.make_transformation_matrix()
                 self.to_task()
         else:
             render_lines_of_text(self.screen, ["Cannot see marker"])
             self.t = 0
+
+    def make_transformation_matrix(self):
+        # Construct the transformation matrix
+        self.ws_origin = np.mean(np.array(self.pts))
+        self.ws_q = np.mean(np.array(self.orientations))
+        # Camera to world
+        # Transform points from camera space to world space
+        # The world origin is the workspace origin, top left corner
+        R_WC = quaternion.as_rotation_matrix(self.ws_q)
+        self.T[:3, :3] = R_WC
+        self.T[3, 3] = 1
+        self.T[:, 3] = self.ws_origin
+
+    def pt_3D_to_screen(self, pt):
+        # pts[:3] = curr_pt - self.ws_origin
+        ws_pt = np.matmul(self.T, pt)[:3]
+        print(ws_pt)
+        # map value
+        screenx = ws_pt[2] * self.xscl
+        screeny = ws_pt[1] * self.yscl
+        return screenx, screeny
 
     def to_task(self):
         self.pts = []
@@ -122,26 +140,28 @@ class FittsTaskNode:
         pygame.draw.circle(self.screen, circle_color, self.circle_pos, self.circle_rad, 0)
 
         if len(self.pts) > 0:
-            # For testing purposes (aligned with bag files)
-            screenx, screeny = self._get_test_transformed_pt()
+            if DEBUG:
+                # For testing purposes (aligned with bag files)
+                screenx, screeny = self._get_test_transformed_pt()
+                curr_pt = np.zeros(4)
+            else:
+                # Compute the screen space point
+                curr_pt = self.pts[-1]
+                screenx, screeny = self.pt_3D_to_screen(curr_pt)
 
-            # Compute the screen space point
-            # curr_pt = self.pts[-1]
-            # print(curr_pt)
-            # # pts[:3] = curr_pt - self.ws_origin
-            # ws_pt = np.matmul(self.T, curr_pt)[:3]
-            # print(ws_pt)
-            # # map value
-            # screenx = ws_pt[2] * self.xscl
-            # screeny = ws_pt[1] * self.yscl
             print(screenx, screeny)
             if not np.isnan(screenx) and not np.isnan(screeny):
-                self.pointer = (int(screenx), int(screeny))
-                # self.pointer = pygame.mouse.get_pos()
+                if DEBUG:
+                    self.pointer = pygame.mouse.get_pos()
+                else:
+                    self.pointer = (int(screenx), int(screeny))
 
             # Draw user pointer
+            pygame.mouse.set_visible(False)
             pygame.draw.circle(self.screen, (0, 255, 0), [self.pointer[0], self.pointer[1]], 5, 0)
+            print(f"Delay: {time.perf_counter() - self.delay_timer}")
 
+            # Handle trajectory and circle logic
             if self._pointer_in_circle():
                 self.is_init_circle = not self.is_init_circle
                 if self.is_init_circle:
@@ -219,7 +239,7 @@ class FittsTaskNode:
 
     def _pygame_init(self):
         pygame.init()
-        self.screen = pygame.display.set_mode()
+        self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         pygame.display.set_caption('Fitts task')
         pygame.font.init()
         self.pg_clock = pygame.time.Clock()
@@ -249,6 +269,7 @@ class FittsTaskNode:
             if not np.any(np.isnan(position)):
                 self.pts.append(position)
                 self.orientations.append(orientation)
+                self.delay_timer = time.perf_counter()
 
 
 class Timepoint:
@@ -270,6 +291,9 @@ class Trajectory:
 
     def add_timepoint(self, tp):
         self.data.append(tp)
+
+    def print(self):
+        print(f"Trajectory: {self.cpos}, {self.crad}, {len(self.data)}")
 
 
 def main():
