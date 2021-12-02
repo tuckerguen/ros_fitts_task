@@ -12,9 +12,10 @@ import quaternion
 import numpy as np
 from enum import Enum
 from util import render_lines_of_text
-from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import PoseArray, Pose, Point, Quaternion
+from std_msgs.msg import Header, Time
 
-DEBUG = True
+DEBUG = False
 
 INTRO_TEXT = ["Performing the fitts task:",
               "1. Calibrate the motion capture",
@@ -108,23 +109,29 @@ class FittsTaskNode:
 
     def make_transformation_matrix(self):
         # Construct the transformation matrix
-        self.ws_origin = np.mean(np.array(self.pts))
+        self.ws_origin = np.mean(np.array(self.pts), axis=0)
         self.ws_q = np.mean(np.array(self.orientations))
+        print(self.ws_origin, self.ws_q)
         # Camera to world
         # Transform points from camera space to world space
         # The world origin is the workspace origin, top left corner
-        R_WC = quaternion.as_rotation_matrix(self.ws_q)
+        R_WC = quaternion.as_rotation_matrix(self.ws_q.inverse())
         self.T[:3, :3] = R_WC
-        self.T[3, 3] = 1
-        self.T[:, 3] = self.ws_origin
+        # self.T[:, 3] = - self.ws_origin
 
     def pt_3D_to_screen(self, pt):
         # pts[:3] = curr_pt - self.ws_origin
-        ws_pt = np.matmul(self.T, pt)[:3]
-        print(ws_pt)
+        ws_pt = np.matmul(self.T, (pt - self.ws_origin))[:3]
+        q = self.ws_q * self.ws_q.inverse()
+        pa = PoseArray(Header(0, rospy.get_rostime(), "polaris_link"), [Pose(Point(ws_pt[0], ws_pt[1], ws_pt[2]), q)])
+        self.pub.publish(pa)
+        print(f"{ws_pt[0]:.2f}, {ws_pt[1]:.2f}, {ws_pt[2]:.2f}")
+        print(self.ws_q * self.ws_q.inverse())
         # map value
-        screenx = ws_pt[2] * self.xscl
-        screeny = ws_pt[1] * self.yscl
+        # screenx = ws_pt[2] * self.xscl
+        # screeny = ws_pt[1] * -self.yscl
+        screenx = ws_pt[2] * 500 + 500
+        screeny = ws_pt[1] * 500 + 500
         return screenx, screeny
 
     def to_task(self):
@@ -259,6 +266,7 @@ class FittsTaskNode:
     def _ros_init(self):
         rospy.init_node('read_polaris', anonymous=True)
         rospy.Subscriber("polaris_sensor/targets", PoseArray, self.polaris_callback, queue_size=1)
+        self.pub = rospy.Publisher("fitts/cspacepts", PoseArray, queue_size=1)
 
     def polaris_callback(self, pose_array):
         pos = pose_array.poses[0].position
