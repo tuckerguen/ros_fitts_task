@@ -11,7 +11,8 @@ import random
 import quaternion
 import numpy as np
 from enum import Enum
-from util import render_lines_of_text
+sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
+from util import render_lines_of_text, Trajectory, Timepoint
 from geometry_msgs.msg import PoseArray, Pose, Point, Quaternion
 from std_msgs.msg import Header, Time
 
@@ -28,9 +29,12 @@ INTRO_TEXT = ["Performing the fitts task:",
 
 TaskState = Enum("TaskState", "INTRO CALIBRATE TASK SAVE EXIT")
 
+"""
+Data comes in at 20Hz, program
+"""
 
 class FittsTaskNode:
-    def __init__(self, screen_size, n_trials=30, frame_rate=100, background_color=(0, 0, 0)):
+    def __init__(self, screen_size, n_trials=5, frame_rate=60, background_color=(0, 0, 0)):
         self.delay_timer = 0
 
         self.pts = []
@@ -59,6 +63,8 @@ class FittsTaskNode:
         self.radius_range = (10, 60)
         self.pointer = (w // 2, h // 2)
         self.n_trials = n_trials
+        self.delay = 1
+        self.delay_timer = 0
 
         self.ws_origin = np.zeros(3)
         self.ws_q = np.quaternion(0, 0, 0, 1)
@@ -110,28 +116,28 @@ class FittsTaskNode:
     def make_transformation_matrix(self):
         # Construct the transformation matrix
         self.ws_origin = np.mean(np.array(self.pts), axis=0)
-        self.ws_q = np.mean(np.array(self.orientations))
+        self.ws_q = np.quaternion(np.mean(np.array(self.orientations)))
+
         print(self.ws_origin, self.ws_q)
-        # Camera to world
-        # Transform points from camera space to world space
-        # The world origin is the workspace origin, top left corner
-        R_WC = quaternion.as_rotation_matrix(self.ws_q.inverse())
-        self.T[:3, :3] = R_WC
-        # self.T[:, 3] = - self.ws_origin
+        # Transformation matrix from camera frame workspace frame
+        R_CW = quaternion.as_rotation_matrix(self.ws_q.inverse())
+        self.T[:3, :3] = R_CW
+        self.T[:3, 3] = np.matmul(R_CW, -self.ws_origin[:3])
+        self.T[3, 3] = 1
 
     def pt_3D_to_screen(self, pt):
-        # pts[:3] = curr_pt - self.ws_origin
-        ws_pt = np.matmul(self.T, (pt - self.ws_origin))[:3]
-        q = self.ws_q * self.ws_q.inverse()
+        ws_pt = np.matmul(self.T, pt)[:3]
+        q = np.zeros(4)
         pa = PoseArray(Header(0, rospy.get_rostime(), "polaris_link"), [Pose(Point(ws_pt[0], ws_pt[1], ws_pt[2]), q)])
         self.pub.publish(pa)
+
         print(f"{ws_pt[0]:.2f}, {ws_pt[1]:.2f}, {ws_pt[2]:.2f}")
         print(self.ws_q * self.ws_q.inverse())
-        # map value
-        # screenx = ws_pt[2] * self.xscl
-        # screeny = ws_pt[1] * -self.yscl
-        screenx = ws_pt[2] * 500 + 500
-        screeny = ws_pt[1] * 500 + 500
+
+        # map value to screen
+        # Check tool definition file for axis configuration
+        screenx = ws_pt[2] * self.xscl
+        screeny = ws_pt[1] * self.yscl
         return screenx, screeny
 
     def to_task(self):
@@ -166,35 +172,44 @@ class FittsTaskNode:
             # Draw user pointer
             pygame.mouse.set_visible(False)
             pygame.draw.circle(self.screen, (0, 255, 0), [self.pointer[0], self.pointer[1]], 5, 0)
-            print(f"Delay: {time.perf_counter() - self.delay_timer}")
+            #print(f"Delay: {time.perf_counter() - self.delay_timer}")
 
             # Handle trajectory and circle logic
             if self._pointer_in_circle():
-                self.is_init_circle = not self.is_init_circle
-                if self.is_init_circle:
-                    print("Adding trajectory to trajectories")
-                    self.trajectories.append(self.trajectory)
-                    self._draw_init_circle()
-                    self.t = 0
-                else:
-                    print("Initializing trajectory")
-                    if len(self.trajectories) < self.n_trials:
-                        self._draw_random_circle()
+                if self.delay_timer > self.delay:
+                    # Flip state
+                    self.is_init_circle = not self.is_init_circle
+                    if self.is_init_circle:
+                        # Draw the init circle
+                        #print("Adding trajectory to trajectories")
+                        self.trajectories.append(self.trajectory)
+                        self._draw_init_circle()
                         self.t = 0
-                        self.trajectory = Trajectory(self.circle_pos, self.circle_rad)
-                        tp = Timepoint(self.t, self.pointer[0], self.pointer[1], curr_pt)
-                        self.trajectory.add_timepoint(tp)
+                        self.delay_timer = 0
                     else:
-                        self.is_init_circle = True
-                        self.save()
-                        self.exit()
+                        # Show new target
+                        print(f"DELAY {self.delay_timer}")
+                        #print("Initializing trajectory")
+                        if len(self.trajectories) < self.n_trials:
+                            self._draw_random_circle()
+                            self.t = 0
+                            self.trajectory = Trajectory(self.circle_pos, self.circle_rad)
+                            tp = Timepoint(self.t, self.pointer[0], self.pointer[1], curr_pt)
+                            self.trajectory.add_timepoint(tp)
+                        else:
+                            self.is_init_circle = True
+                            self.save()
+                            self.exit()
+                else:
+                    self.delay_timer += self.dt
+                    print(f"DELAY {self.delay_timer}")
             else:
                 if not self.is_init_circle:
-                    print("Adding timepoint")
+                    #print("Adding timepoint")
                     self.t += self.dt
-                    print(self.t)
+                    #print(self.t)
                     tp = Timepoint(self.t, self.pointer[0], self.pointer[1], curr_pt)
-                    tp.print()
+                    # tp.print()
                     self.trajectory.add_timepoint(tp)
 
     def save(self):
@@ -208,24 +223,6 @@ class FittsTaskNode:
     def exit(self):
         pygame.quit()
         sys.exit(0)
-
-    def _get_test_transformed_pt(self):
-        pt = self.pts[-1]
-        ws_origin = np.array([0.1217, 0.2804, -0.9552])
-        # pts[:3] = self.pts[-1] - ws_origin
-        table_plane_q = np.quaternion(0.0399, 0.1631, -0.2353, 0.9572)
-        R_ws_yz = quaternion.as_rotation_matrix(table_plane_q).T
-        T_ws_yz = np.zeros((4, 4))
-        T_ws_yz[:3, :3] = R_ws_yz
-        T_ws_yz[3, 3] = 1
-        T_ws_yz[:3, 3] = np.matmul(-R_ws_yz, ws_origin.T)
-
-        rot_pt = np.matmul(T_ws_yz, pt)
-        xscl = 1920 / 0.3683
-        yscl = 1080 / 0.2286
-        screenx = rot_pt[2] * xscl
-        screeny = rot_pt[1] * yscl
-        return screenx, screeny
 
     def _draw_init_circle(self):
         self.screen.fill(self.background_color)
@@ -277,36 +274,14 @@ class FittsTaskNode:
             if not np.any(np.isnan(position)):
                 self.pts.append(position)
                 self.orientations.append(orientation)
-                self.delay_timer = time.perf_counter()
+                # self.delay_timer = time.perf_counter()
 
-
-class Timepoint:
-    def __init__(self, t, x, y, pt_3d):
-        self.t = t
-        self.x = x
-        self.y = y
-        self.pt_3d = pt_3d
-
-    def print(self):
-        print(f"{self.t:.2f}: ({self.x}, {self.y}), ({self.pt_3d[0]:0.3f}, {self.pt_3d[1]:0.3f}, {self.pt_3d[2]:0.3f})")
-
-
-class Trajectory:
-    def __init__(self, cpos, crad):
-        self.cpos = cpos
-        self.crad = crad
-        self.data = []
-
-    def add_timepoint(self, tp):
-        self.data.append(tp)
-
-    def print(self):
-        print(f"Trajectory: {self.cpos}, {self.crad}, {len(self.data)}")
 
 
 def main():
     # node = FittsTaskNode(screen_size=(0.6858, 0.3556))  # Big monitor (27")
-    node = FittsTaskNode(screen_size=(0.505, 0.2805))  # Small monitor (21.5")
+    # node = FittsTaskNode(screen_size=(0.505, 0.2805))  # Small monitor (21.5")
+    node = FittsTaskNode(screen_size=(0.37, 0.23))  # laptop
     while node.is_pygame_running():
         node.step()
 
