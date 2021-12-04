@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import math
+import json
 import rospy
 import rospkg
 import pickle
@@ -11,8 +12,9 @@ import random
 import quaternion
 import numpy as np
 from enum import Enum
+from datetime import datetime
 sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
-from util import render_lines_of_text, Trajectory, Timepoint
+from util import render_lines_of_text, Trajectory, Timepoint, Trial
 from geometry_msgs.msg import PoseArray, Pose, Point, Quaternion
 from std_msgs.msg import Header, Time
 
@@ -33,9 +35,10 @@ TaskState = Enum("TaskState", "INTRO CALIBRATE TASK SAVE EXIT")
 Data comes in at 20Hz, program
 """
 
+
 class FittsTaskNode:
-    def __init__(self, screen_size, n_trials=5, frame_rate=60, background_color=(0, 0, 0)):
-        self.delay_timer = 0
+    def __init__(self, screen_size, trial_dirname="tucker", n_trials=20, frame_rate=60, background_color=(0, 0, 0)):
+        self.trial_dirname = trial_dirname
 
         self.pts = []
         self.orientations = []
@@ -72,7 +75,7 @@ class FittsTaskNode:
         self.xscl = self.screen_w / screen_size[0]
         self.yscl = self.screen_h / screen_size[1]
 
-        self.trajectories = []
+        self.trial = Trial()
         self.trajectory = None
 
     def step(self):
@@ -153,14 +156,9 @@ class FittsTaskNode:
         pygame.draw.circle(self.screen, circle_color, self.circle_pos, self.circle_rad, 0)
 
         if len(self.pts) > 0:
-            if DEBUG:
-                # For testing purposes (aligned with bag files)
-                screenx, screeny = self._get_test_transformed_pt()
-                curr_pt = np.zeros(4)
-            else:
-                # Compute the screen space point
-                curr_pt = self.pts[-1]
-                screenx, screeny = self.pt_3D_to_screen(curr_pt)
+            # Compute the screen space point
+            curr_pt = self.pts[-1]
+            screenx, screeny = self.pt_3D_to_screen(curr_pt)
 
             print(screenx, screeny)
             if not np.isnan(screenx) and not np.isnan(screeny):
@@ -175,14 +173,15 @@ class FittsTaskNode:
             #print(f"Delay: {time.perf_counter() - self.delay_timer}")
 
             # Handle trajectory and circle logic
+            # TODO: Clean up this logic
             if self._pointer_in_circle():
                 if self.delay_timer > self.delay:
                     # Flip state
                     self.is_init_circle = not self.is_init_circle
                     if self.is_init_circle:
                         # Draw the init circle
-                        #print("Adding trajectory to trajectories")
-                        self.trajectories.append(self.trajectory)
+                        #print("Adding trajectory to old_trajectories")
+                        self.trial.add_trajectory(self.trajectory)
                         self._draw_init_circle()
                         self.t = 0
                         self.delay_timer = 0
@@ -190,7 +189,7 @@ class FittsTaskNode:
                         # Show new target
                         print(f"DELAY {self.delay_timer}")
                         #print("Initializing trajectory")
-                        if len(self.trajectories) < self.n_trials:
+                        if len(self.trial.trajectories) < self.n_trials:
                             self._draw_random_circle()
                             self.t = 0
                             self.trajectory = Trajectory(self.circle_pos, self.circle_rad)
@@ -215,9 +214,20 @@ class FittsTaskNode:
     def save(self):
         print("saving")
         rospack = rospkg.RosPack()
-        pkl_path = os.path.join(rospack.get_path('fitts_task'), "trajectories", "test_traj.pkl")
-        with open(pkl_path, 'wb') as f:
-            pickle.dump(self.trajectories, f)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+        target_dir = os.path.join(rospack.get_path('fitts_task'), "trials", self.trial_dirname)
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir, exist_ok=True)
+
+        traj_pkl_path = os.path.join(target_dir, f"{timestamp}.pkl")
+        with open(traj_pkl_path, 'wb') as f:
+            pickle.dump(self.trial, f)
+
+        # TODO: Save the important parameters of the task like timestep and such
+        # task_pkl_path = os.path.join(target_dir, f"{timestamp}_task_obj.pkl")
+        # with open(task_pkl_path, "wb") as f:
+        #     pickle.dump(self, f)
+
         self.state = TaskState.EXIT
 
     def exit(self):
