@@ -3,6 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+def all_pts_close(pts, tol=0.0000001):
+    if not pts:
+        return True
+    pts = np.array(pts)
+    in_tol = [np.all(np.abs(pts[:, i] - np.mean(pts[:, i])) < tol) for i in range(2)]
+    return np.all(in_tol)
+
+
 def pygame_get_screenres():
     pygame.display.set_mode((0, 0), pygame.WINDOWMINIMIZED)
     pygame.init()
@@ -49,6 +57,9 @@ class Trajectory:
         self.cpos = cpos
         self.crad = crad
         self.timepoints = []
+
+    def __getitem__(self, item):
+        return self.timepoints[item]
 
     def add_timepoint(self, tp):
         self.timepoints.append(tp)
@@ -132,3 +143,4 @@ class Trial:
                 pygame.quit()
                 return
         pygame.quit()
+

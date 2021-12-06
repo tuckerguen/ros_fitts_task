@@ -14,11 +14,11 @@ import numpy as np
 from enum import Enum
 from datetime import datetime
 sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
-from util import render_lines_of_text, Trajectory, Timepoint, Trial
+from util import render_lines_of_text, Trajectory, Timepoint, Trial, all_pts_close
 from geometry_msgs.msg import PoseArray, Pose, Point, Quaternion
 from std_msgs.msg import Header, Time
 
-DEBUG = False
+DEBUG = True
 
 INTRO_TEXT = ["Performing the fitts task:",
               "1. Calibrate the motion capture",
@@ -77,6 +77,8 @@ class FittsTaskNode:
 
         self.trial = Trial()
         self.trajectory = None
+
+        self.pointer_pts = []
 
     def step(self):
         # self.all_step_render()
@@ -164,23 +166,29 @@ class FittsTaskNode:
             if not np.isnan(screenx) and not np.isnan(screeny):
                 if DEBUG:
                     self.pointer = pygame.mouse.get_pos()
+                    self.pointer_pts.append(np.array(self.pointer))
                 else:
                     self.pointer = (int(screenx), int(screeny))
 
             # Draw user pointer
             pygame.mouse.set_visible(False)
             pygame.draw.circle(self.screen, (0, 255, 0), [self.pointer[0], self.pointer[1]], 5, 0)
-            #print(f"Delay: {time.perf_counter() - self.delay_timer}")
 
             # Handle trajectory and circle logic
             # TODO: Clean up this logic
             if self._pointer_in_circle():
-                if self.delay_timer > self.delay:
+                # Ensure that the pointer is (roughly) stopped in the target circle
+                if not self.is_init_circle:
+                    if not all_pts_close(self.pointer_pts[-int(self.delay // self.dt):], 2):
+                        self.delay_timer = 0
+                    else:
+                        self.delay_timer = self.delay
+                # If we've waited long enough in the circle
+                if self.delay_timer >= self.delay:
                     # Flip state
                     self.is_init_circle = not self.is_init_circle
                     if self.is_init_circle:
                         # Draw the init circle
-                        #print("Adding trajectory to old_trajectories")
                         self.trial.add_trajectory(self.trajectory)
                         self._draw_init_circle()
                         self.t = 0
@@ -188,13 +196,13 @@ class FittsTaskNode:
                     else:
                         # Show new target
                         print(f"DELAY {self.delay_timer}")
-                        #print("Initializing trajectory")
                         if len(self.trial.trajectories) < self.n_trials:
                             self._draw_random_circle()
                             self.t = 0
                             self.trajectory = Trajectory(self.circle_pos, self.circle_rad)
                             tp = Timepoint(self.t, self.pointer[0], self.pointer[1], curr_pt)
                             self.trajectory.add_timepoint(tp)
+                            self.delay_timer = 0
                         else:
                             self.is_init_circle = True
                             self.save()
@@ -204,11 +212,8 @@ class FittsTaskNode:
                     print(f"DELAY {self.delay_timer}")
             else:
                 if not self.is_init_circle:
-                    #print("Adding timepoint")
                     self.t += self.dt
-                    #print(self.t)
                     tp = Timepoint(self.t, self.pointer[0], self.pointer[1], curr_pt)
-                    # tp.print()
                     self.trajectory.add_timepoint(tp)
 
     def save(self):
