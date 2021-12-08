@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 class FittsTaskViewer:
     def __init__(self,
                  task: 'FittsTask',
-                 display_size: Tuple[int, int] = None,
+                 display_size: Tuple[int, int] = (0, 0),
                  fullscreen: bool = True,
                  pointer_size: int = 5,
                  pointer_color: Union[Tuple[int], Color] = (255, 255, 255),
@@ -48,14 +48,20 @@ class FittsTaskViewer:
         if not is_pygame_running():
             raise RuntimeError("Viewer failed. pygame display failed or was closed")
 
-        color = self.home_color if self.task.is_home_state else self.target_color
         self.screen.fill(self.bg_color)
         pygame.mouse.set_visible(False)
+
+        # Draw the current circle
+        color = self.home_color if self.task.is_home_state else self.target_color
         target_screen_pos = self._map_to_screen(self.task.target_pos)
         size_scl = min(self.display_size) / min(self.task.workspace_lims[:, 1])
         pygame.draw.circle(self.screen, color, target_screen_pos, self.task.target_size * size_scl, 0)
-        pointer_screen_pos = self._map_to_screen(self.task.pointer_pts[-1])
-        pygame.draw.circle(self.screen, self.pointer_color, pointer_screen_pos, self.pointer_size, 0)
+
+        # Draw the pointer
+        if self.task.pointer_pts:
+            pointer_screen_pos = self._map_to_screen(self.task.pointer_pts[-1])
+            pygame.draw.circle(self.screen, self.pointer_color, pointer_screen_pos, self.pointer_size, 0)
+
         pygame.display.flip()
         pygame.display.update()
 

@@ -1,5 +1,6 @@
 #!/home/tucker/anaconda3/bin/python3
 import sys
+import dill
 import numpy as np
 from enum import Enum
 from typing import Tuple
@@ -7,8 +8,6 @@ from viewer import FittsTaskViewer
 
 
 class FittsTask:
-    CircleState = Enum("CircleState", [("HOME", True), ("TARGET", False)])
-
     def __init__(self,
                  workspace_lims: Tuple[Tuple[int, ...], ...],
                  target_size_lims: Tuple[float, ...],
@@ -42,8 +41,6 @@ class FittsTask:
             render_kwargs = {}
 
         assert 0 < len(workspace_lims) < 3, "Workspace should be 1D, 2D, or 3D"
-        assert workspace_lims[0][0] < home_pos[0] < workspace_lims[0][1] \
-               and workspace_lims[1][0] < home_pos[1] < workspace_lims[1][1], "Home pos must be within the workspace limits"
         assert len(workspace_lims) == len(home_pos), "Home position must have same dimensionality as workspace"
         assert len(target_size_lims) == 2, "Target size limits must be a tuple, (min, max)"
         assert target_size_lims[0] < target_size_lims[1], "First target size must be smaller than second target size"
@@ -51,9 +48,12 @@ class FittsTask:
         self.workspace_lims = np.array(workspace_lims)
         self.ndim = len(workspace_lims)
 
+        assert all([workspace_lims[i][0] <= home_pos[i] <= workspace_lims[i][1] for i in range(self.ndim)]), \
+            "Home pos must be within the workspace limits"
+
         self.target_pos = home_pos
         self.target_size = home_size
-        self.is_home_state = FittsTask.CircleState.HOME
+        self.is_home_state = True
         self.home_size = home_size
         self.home_pos = home_pos
         self.target_size_lims = target_size_lims
@@ -64,14 +64,13 @@ class FittsTask:
         self.pointer_pts = []
 
         self.render = render
-        if self.render:
-            self.viewer = FittsTaskViewer(self, **render_kwargs)
+        self.viewer = None
+        self.render_kwargs = render_kwargs
+        self.try_render()
 
     def step(self, p_pointer: np.ndarray) -> Tuple[bool, np.ndarray, float]:
         self.pointer_pts.append(p_pointer)
-        # Render circle every step
-        if self.viewer:
-            self.viewer.render()
+        self.try_render()
 
         success = False
         # Once the pointer enters the circle
@@ -95,6 +94,17 @@ class FittsTask:
 
         return success, self.target_pos, self.target_size
 
+    def try_render(self):
+        if self.render and not self.viewer:
+            self.viewer = FittsTaskViewer(self, **self.render_kwargs)
+        if self.render:
+            self.viewer.render()
+
+    def pickle(self, f):
+        with open(f, "wb") as pkl_file:
+            setattr(self, "viewer", None)
+            dill.dump(self, pkl_file)
+
     def exit(self):
         if self.viewer:
             self.viewer.exit()
@@ -110,3 +120,8 @@ class FittsTask:
         pts = np.array(self.pointer_pts[-self.steps_to_wait:])
         in_tol = [np.all(np.abs(pts[:, i] - np.mean(pts[:, i])) < self.stationary_tolerance) for i in range(self.ndim)]
         return np.all(in_tol)
+
+
+def from_pickle(f):
+    with open(f, "rb") as pkl_file:
+        return dill.load(pkl_file)
