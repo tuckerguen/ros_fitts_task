@@ -16,7 +16,8 @@ class FittsTask:
                  home_size: float,
                  steps_to_wait: int,
                  stationary_tolerance: float = 2,
-                 render: bool = True):
+                 render: bool = True,
+                 render_kwargs=None):
         """
         Simulates a 1D, 2D, or 3D fitts task where an agent must begin at a
         home location and move its point to the target location. Once the
@@ -27,13 +28,19 @@ class FittsTask:
         :param target_size_lims: Limits of the size of the target. The size of the target is chosen randomly
         :param home_pos: The position in the workspace of the home
         :param home_size: The size of the home position
-        :param steps_to_wait: The number of calls to FittsTask.step() the agent must be stationary within the
-                              home or target circle for.
+        :param steps_to_wait: The number of calls to FittsTask.step() the agent must stay stationary within the
+                              home or target circle for before the task is considered complete. This parameter is given
+                              in terms of the number of calls to step() because the task should have no notion of time.
+                              By allowing the encapsulating program to specify the time step and the length of time per
+                              step, we limit the likelihood of having not synchronous simulation.
         :param stationary_tolerance: The tolerance to which changes in position are considered "stationary"
                                      Points that fall within the stationary_tolerance of one another are considered
                                      to be the same.
         :param render: Render the task to the screen
         """
+        if render_kwargs is None:
+            render_kwargs = {}
+
         assert 0 < len(workspace_lims) < 3, "Workspace should be 1D, 2D, or 3D"
         assert workspace_lims[0][0] < home_pos[0] < workspace_lims[0][1] \
                and workspace_lims[1][0] < home_pos[1] < workspace_lims[1][1], "Home pos must be within the workspace limits"
@@ -58,7 +65,7 @@ class FittsTask:
 
         self.render = render
         if self.render:
-            self.viewer = FittsTaskViewer(self)
+            self.viewer = FittsTaskViewer(self, **render_kwargs)
 
     def step(self, p_pointer: np.ndarray) -> Tuple[bool, np.ndarray, float]:
         self.pointer_pts.append(p_pointer)
@@ -77,6 +84,7 @@ class FittsTask:
                     # Set the circle to home
                     self.target_pos = self.home_pos
                     self.target_size = self.home_size
+                    success = True
                 else:
                     # Set the circle to a new random point
                     self.target_size = np.random.uniform(self.target_size_lims[0], self.target_size_lims[1], 1)[0]

@@ -3,7 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-
+def is_pygame_running():
+    running = True
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    return running
 
 
 def pygame_get_screenres():
