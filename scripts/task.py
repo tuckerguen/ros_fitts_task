@@ -4,7 +4,7 @@ import dill
 import numpy as np
 from enum import Enum
 from typing import Tuple
-from viewer import FittsTaskViewer
+from scripts.viewer import FittsTaskViewer
 
 
 class FittsTask:
@@ -115,8 +115,8 @@ class FittsTask:
         return distance < self.target_size
 
     def _all_pts_close(self):
-        if not self.pointer_pts:
-            return True
+        if not self.pointer_pts or len(self.pointer_pts) < self.steps_to_wait:
+            return False
         pts = np.array(self.pointer_pts[-self.steps_to_wait:])
         in_tol = [np.all(np.abs(pts[:, i] - np.mean(pts[:, i])) < self.stationary_tolerance) for i in range(self.ndim)]
         return np.all(in_tol)

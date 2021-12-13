@@ -2,10 +2,10 @@ import pygame
 import numpy as np
 from typing import Tuple, Union, TYPE_CHECKING
 from pygame import Color
-from util import is_pygame_running
+from scripts.util import is_pygame_running
 
 if TYPE_CHECKING:
-    from task import FittsTask
+    from scripts.task import FittsTask
 
 
 class FittsTaskViewer:

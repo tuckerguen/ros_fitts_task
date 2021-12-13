@@ -1,7 +1,7 @@
-from task import FittsTask, from_pickle
 import pickle
 import numpy as np
 import pygame
+from scripts.task import FittsTask, from_pickle
 
 
 def main():
@@ -19,9 +19,6 @@ def main():
                      steps_to_wait=int(delay_secs * framerate),
                      render=True,
                      render_kwargs=dict(display_size=(2560, 1440), fullscreen=True))
-
-    task.pickle("./test.pkl")
-    task = from_pickle("./test.pkl")
 
     # Run all trials
     while n < n_trials:
