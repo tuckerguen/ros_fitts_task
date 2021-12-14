@@ -4,7 +4,7 @@ import dill
 import numpy as np
 from enum import Enum
 from typing import Tuple
-from scripts.viewer import FittsTaskViewer
+from viewer import FittsTaskViewer
 
 
 class FittsTask:

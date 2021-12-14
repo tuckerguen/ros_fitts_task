@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 import pygame
-from scripts.task import FittsTask, from_pickle
+from task import FittsTask, from_pickle
 
 
 def main():

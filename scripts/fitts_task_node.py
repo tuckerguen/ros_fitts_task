@@ -14,7 +14,7 @@ import numpy as np
 from enum import Enum
 from datetime import datetime
 sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
-from util import render_lines_of_text, Trajectory, Timepoint, Trial, all_pts_close
+from util import render_lines_of_text, Trajectory, Timepoint, Trial
 from geometry_msgs.msg import PoseArray, Pose, Point, Quaternion
 from std_msgs.msg import Header, Time
 

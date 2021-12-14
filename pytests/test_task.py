@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from scripts.task import FittsTask
+from task import FittsTask
 
 
 class TestFittsTask(unittest.TestCase):
