@@ -66,10 +66,12 @@ class FittsTaskViewer:
         pygame.display.update()
 
     def _map_to_screen(self, pt):
-        pt = pt - self.task.workspace_lims[:, 0]
-        scl = np.array(self.display_size) / (self.task.workspace_lims[:, 1] - self.task.workspace_lims[:, 0])
-        screen_pt = pt * scl
-        return np.round(screen_pt, 0).astype(np.int32)
+        if pt is not None:
+            pt = pt - self.task.workspace_lims[:, 0]
+            scl = np.array(self.display_size) / (self.task.workspace_lims[:, 1] - self.task.workspace_lims[:, 0])
+            screen_pt = pt * scl
+            return np.round(screen_pt, 0).astype(np.int32)
+        return 0, 0
 
     def _pygame_init(self):
         pygame.init()

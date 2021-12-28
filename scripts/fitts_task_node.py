@@ -14,11 +14,11 @@ import numpy as np
 from enum import Enum
 from datetime import datetime
 sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
-from util import render_lines_of_text, Trajectory, Timepoint, Trial
+from util import render_lines_of_text, Trajectory, Timepoint, Trial, all_pts_close
 from geometry_msgs.msg import PoseArray, Pose, Point, Quaternion
 from std_msgs.msg import Header, Time
 
-DEBUG = True
+DEBUG = False
 
 INTRO_TEXT = ["Performing the fitts task:",
               "1. Calibrate the motion capture",
@@ -241,8 +241,8 @@ class FittsTaskNode:
 
     def _draw_init_circle(self):
         self.screen.fill(self.background_color)
-        self.circle_rad = 10
-        self.circle_pos = (10, self.screen.get_height() // 2 - self.circle_rad)
+        self.circle_rad = 13
+        self.circle_pos = (self.screen.get_width() // 2 - self.circle_rad, self.screen.get_height() // 2 - self.circle_rad)
         pygame.draw.circle(self.screen, self.init_circle_color, self.circle_pos, self.circle_rad)
 
     def _draw_random_circle(self):
@@ -296,7 +296,8 @@ class FittsTaskNode:
 def main():
     # node = FittsTaskNode(screen_size=(0.6858, 0.3556))  # Big monitor (27")
     # node = FittsTaskNode(screen_size=(0.505, 0.2805))  # Small monitor (21.5")
-    node = FittsTaskNode(screen_size=(0.37, 0.23))  # laptop
+    # Lab monitor. 1920x1080, 92 dpi = 20.869565217 in x 11.73913 in = 0.5300869565118m x 0.298173902m
+    node = FittsTaskNode(screen_size=(0.5300869565118, 0.298173902))  # laptop
     while node.is_pygame_running():
         node.step()
 

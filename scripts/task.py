@@ -9,7 +9,7 @@ from viewer import FittsTaskViewer
 
 class FittsTask:
     def __init__(self,
-                 workspace_lims: Tuple[Tuple[int, ...], ...],
+                 workspace_lims: Tuple[Tuple[float, ...], ...],
                  target_size_lims: Tuple[float, ...],
                  home_pos: Tuple[float, ...],
                  home_size: float,
@@ -40,16 +40,13 @@ class FittsTask:
         if render_kwargs is None:
             render_kwargs = {}
 
-        assert 0 < len(workspace_lims) < 3, "Workspace should be 1D, 2D, or 3D"
-        assert len(workspace_lims) == len(home_pos), "Home position must have same dimensionality as workspace"
-        assert len(target_size_lims) == 2, "Target size limits must be a tuple, (min, max)"
-        assert target_size_lims[0] < target_size_lims[1], "First target size must be smaller than second target size"
+        self._validate_inputs(workspace_lims, home_pos, target_size_lims)
 
         self.workspace_lims = np.array(workspace_lims)
         self.ndim = len(workspace_lims)
 
-        assert all([workspace_lims[i][0] <= home_pos[i] <= workspace_lims[i][1] for i in range(self.ndim)]), \
-            "Home pos must be within the workspace limits"
+        if not all([workspace_lims[i][0] <= home_pos[i] <= workspace_lims[i][1] for i in range(self.ndim)]):
+            raise ValueError("Home pos must be within the workspace limits")
 
         self.target_pos = home_pos
         self.target_size = home_size
@@ -121,7 +118,22 @@ class FittsTask:
         in_tol = [np.all(np.abs(pts[:, i] - np.mean(pts[:, i])) < self.stationary_tolerance) for i in range(self.ndim)]
         return np.all(in_tol)
 
+    def _validate_inputs(self, workspace_lims, home_pos, target_size_lims):
+        if not (0 < len(workspace_lims) < 3):
+            raise ValueError("Workspace should be 1D, 2D, or 3D")
+        if len(workspace_lims) != len(home_pos):
+            raise ValueError("Home position must have same dimensionality as workspace")
+        if len(target_size_lims) != 2:
+            raise ValueError("Target size limits must be a tuple, (min, max)")
+        if target_size_lims[0] >= target_size_lims[1]:
+            raise ValueError("First target size must be smaller than second target size")
+
 
 def from_pickle(f):
     with open(f, "rb") as pkl_file:
         return dill.load(pkl_file)
+
+
+class TimeDelayWrapper:
+    def __init__(self, task, delay):
+

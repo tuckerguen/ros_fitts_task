@@ -2,23 +2,25 @@ import pickle
 import numpy as np
 import pygame
 from task import FittsTask, from_pickle
+from util import pygame_get_screenres
 
 
 def main():
     clock = pygame.time.Clock()
     framerate = 60
     delay_secs = 0.5
-    n_trials = 1
+    n_trials = 2
     n = 0
+    w, h = pygame_get_screenres()
 
     # Initialize the task
-    task = FittsTask(workspace_lims=((0, 2560), (0, 1440)),
-                     target_size_lims=(10, 20),
-                     home_pos=(10, 1440//2),
-                     home_size=10,
+    task = FittsTask(workspace_lims=((0, w), (0, h)),
+                     target_size_lims=(10, 30),
+                     home_pos=(w//2, h//2),
+                     home_size=15,
                      steps_to_wait=int(delay_secs * framerate),
                      render=True,
-                     render_kwargs=dict(display_size=(2560, 1440), fullscreen=True))
+                     render_kwargs=dict(display_size=(w, h), fullscreen=True))
 
     # Run all trials
     while n < n_trials:
