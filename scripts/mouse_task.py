@@ -21,7 +21,7 @@ def main():
                      render=True,
                      render_kwargs=dict(display_size=(w, h), fullscreen=True))
 
-    time_delay = 0.5
+    time_delay = 0.1
     n_delay_steps = int(round(time_delay * framerate))
     task = TimeDelayWrapper(task, n_delay_steps)
 

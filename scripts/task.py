@@ -137,12 +137,20 @@ def from_pickle(f):
         return dill.load(pkl_file)
 
 
-class TimeDelayWrapper:
+class TaskWrapper:
+    def __init__(self, task):
+        self.task = task
+
+    def __getattr__(self, item):
+        return self.task.__getattribute__(item)
+
+
+class TimeDelayWrapper(TaskWrapper):
     def __init__(self, task, delay_steps):
+        super().__init__(task)
         self.delay_buffer = deque(maxlen=delay_steps)
         for _ in range(delay_steps):
             self.delay_buffer.append(np.array([0, 0]))
-        self.task = task
 
     def step(self, p_pointer: np.ndarray) -> Tuple[bool, Tuple[float, ...], float]:
         pt = self.delay_buffer.pop()
