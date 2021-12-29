@@ -1,7 +1,5 @@
 import os
 import time
-import pygame
-import rosbag
 import rospkg
 from shutil import copyfile
 from datetime import datetime
@@ -10,14 +8,12 @@ from mocap import MocapTracker
 from util import pygame_get_screenres, Trial, Timepoint, Trajectory
 
 if __name__ == "__main__":
-    # Trial parameters
+    # CONFIG
     username = "tucker"
-
-    clock = pygame.time.Clock()
     framerate = 60
     delay_secs = 0.5
     n_trials = 2
-
+    calib_secs = 5
     WS_WIDTH = 0.5300869565118
     WS_HEIGHT = 0.298173902
 
@@ -31,13 +27,15 @@ if __name__ == "__main__":
     t0 = time.process_time()
 
     # Create the mocap task
-    mocap = MocapTracker()
+    mocap = MocapTracker(os.path.join(target_dir, "rosbag.bag"))
     # Run calibration
     calib_start_time = time.process_time() - t0
-    mocap.calibrate()
+    mocap.calibrate(calib_secs)
     calib_end_time = time.process_time() - t0
 
     # Create the fitts task
+    # NOTE: When using a viewer, create the FittsTask after performing
+    #  calibration to avoid interference of the existing pygame screen
     task = FittsTask(workspace_lims=((0, WS_WIDTH), (0, WS_HEIGHT)),
                      target_size_lims=(0.01, 0.02),
                      home_pos=(WS_WIDTH / 2, WS_HEIGHT / 2),
@@ -48,13 +46,13 @@ if __name__ == "__main__":
                      render_kwargs=dict(display_size=pygame_get_screenres(), fullscreen=True))
     task = TimeDelayWrapper(task, 0)
 
-    # Track the trial
+    # TRIAL
     trial = Trial(framerate=framerate, delay_secs=delay_secs, n_trials=1)
     task_start_time = time.process_time() - t0
     trial.run(task, mocap.get_mocap_pt)
     task_end_time = time.process_time() - t0
 
-    # Trial tracking data
+    # SAVE
     # rosbag
     # Mocap tracker
     mocap.save(os.path.join(target_dir, "mocap.pkl"))

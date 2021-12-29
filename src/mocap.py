@@ -6,6 +6,7 @@ import numpy as np
 import pygame
 import quaternion
 import rospy
+import rosbag
 
 sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
 
@@ -14,10 +15,12 @@ from util import is_pygame_running, render_lines_of_text
 
 
 class MocapTracker:
-    def __init__(self):
+    def __init__(self, bag_path):
         # Set up ROS
         rospy.init_node('read_polaris', anonymous=True)
         rospy.Subscriber("polaris_sensor/targets", PoseArray, self.polaris_callback, queue_size=1)
+
+        self.bag = rosbag.Bag(bag_path)
 
         # Data tracking and control flow
         self.collect_data = False
@@ -29,13 +32,16 @@ class MocapTracker:
         self.cb_q = np.nan  # Calibration quaternion
         self.T = None  # Computed transformation matrix from calibration
 
+        # Default framerate, doesn't matter during calibration
+        self.framerate = 60
+
     def get_mocap_pt(self):
         if not np.any(np.isnan(self.cb_pt)):
             return np.matmul(self.T, self.cb_pt)[1:3]
         else:
             return None
 
-    def calibrate(self):
+    def calibrate(self, time):
         """
         With the marker placed at the origin of the workspace (world) coordinate frame, we collect
         some data to create the camera to world matrix. We invert that and apply it to 3D points
@@ -55,7 +61,7 @@ class MocapTracker:
         calib_qs = []
 
         dt = 1 / self.framerate
-        wait_steps = self.framerate * self.calib_secs
+        wait_steps = self.framerate * time
         i = 0
 
         while i < wait_steps:
@@ -98,6 +104,8 @@ class MocapTracker:
         self.T = T
 
     def polaris_callback(self, pose_array):
+        self.bag.write("polaris_sensor/targets", pose_array)
+
         pos = pose_array.poses[0].position
         position = np.array([pos.x, pos.y, pos.z, 1])
         q = pose_array.poses[0].orientation
