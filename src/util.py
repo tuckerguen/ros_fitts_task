@@ -1,3 +1,4 @@
+import dill
 import pygame
 import numpy as np
 import matplotlib.pyplot as plt
@@ -45,15 +46,12 @@ class Timepoint:
     """
     A single timepoint. Given by timestamp, x pixel, y pixel, 3d point
     """
-    def __init__(self, t, x, y, pt_3d):
+    def __init__(self, t, pt):
         self.t = t
-        self.x = x
-        self.y = y
-        self.pt_3d = pt_3d
+        self.pt = pt
 
     def print(self):
-        print(f"{self.t:.2f}: ({self.x}, {self.y}), "
-              f"({self.pt_3d[0]:0.3f}, {self.pt_3d[1]:0.3f}, {self.pt_3d[2]:0.3f})")
+        print(f"{self.t:.2f}: ({self.pt})")
 
 
 class Trajectory:
@@ -76,14 +74,13 @@ class Trajectory:
         print(f"Trajectory: {self.cpos}, {self.crad}, {len(self.timepoints)}")
 
     def to_numpy(self):
-        coords = np.array([(tp.x, tp.y) for tp in self.timepoints])
-        pts_3d = np.array([tp.pt_3d for tp in self.timepoints])
+        pts = np.array([tp.pt for tp in self.timepoints])
         times = np.array([tp.t for tp in self.timepoints])
-        return coords[:, 0], coords[:, 1], times, pts_3d
+        return times, pts
 
     def plot2d(self):
-        x, y, _, _ = self.to_numpy()
-        plt.scatter(x, y)
+        _, pts = self.to_numpy()
+        plt.scatter(pts[:, 0], pts[:, 1])
         plt_config_for_screen()
         plt.show()
 
@@ -99,7 +96,7 @@ class Trajectory:
     def pygame_draw(self, screen, clock, dt, speed=1):
         for tp in self.timepoints:
             pygame.draw.circle(screen, (0, 0, 255), self.cpos, self.crad, 0)
-            pygame.draw.circle(screen, (255, 255, 255), (tp.x, tp.y), 5, 0)
+            pygame.draw.circle(screen, (255, 255, 255), (tp.pt[0], tp.pt[1]), 5, 0)
             pygame.display.flip()
             pygame.display.update()
             clock.tick(int(1 / dt) * speed)
@@ -113,8 +110,11 @@ class Trial:
     """
     A collection of old_trajectories
     """
-    def __init__(self):
+    def __init__(self, framerate=60, delay_secs=0.5, n_trials=5):
         self.trajectories = []
+        self.framerate = framerate
+        self.delay_secs = delay_secs
+        self.n_trials = n_trials
 
     def __len__(self):
         return len(self.trajectories)
@@ -122,13 +122,46 @@ class Trial:
     def __getitem__(self, item):
         return self.trajectories[item]
 
+    def run(self, task, pointer_func):
+        clock = pygame.time.Clock()
+        traj = None
+
+        # Main game loop
+        n = 0
+        t = 0
+        while n < self.n_trials:
+            p_pointer = pointer_func()
+            is_home, success, target_pos, target_size = task.step(p_pointer)
+
+            # Track the trial points at the correct times
+            if not is_home:
+                if not traj:
+                    traj = Trajectory(target_pos, target_size)
+                    t = 0
+                tp = Timepoint(t, p_pointer)
+                traj.add_timepoint(tp)
+
+            if success:
+                n += 1
+                self.add_trajectory(traj)
+                traj = None
+
+            t += 1 / self.framerate
+            clock.tick(self.framerate)
+
+        task.exit()
+
+    def save(self, fp):
+        with open(fp, "wb") as f:
+            dill.dump(self, f)
+
     def add_trajectory(self, t):
         self.trajectories.append(t)
 
     def plot(self):
         for traj in self.trajectories:
-            x, y, _, _ = traj.to_numpy()
-            plt.plot(x, y)
+            _, pts = traj.to_numpy()
+            plt.plot(pts[:, 0], pts[:, 1])
         plt_config_for_screen()
         plt.show()
 

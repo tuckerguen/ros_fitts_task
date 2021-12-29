@@ -1,15 +1,16 @@
-import numpy as np
+import os
+from shutil import copyfile
 import pygame
+import pickle
+import numpy as np
 from task import FittsTask, TimeDelayWrapper
-from util import pygame_get_screenres
+from util import pygame_get_screenres, Trial, Trajectory, Timepoint
 
 
 def main():
-    clock = pygame.time.Clock()
-    framerate = 60
     delay_secs = 0.5
-    n_trials = 2
-    n = 0
+    framerate = 60
+
     w, h = pygame_get_screenres()
 
     # Initialize the task
@@ -21,19 +22,21 @@ def main():
                      render=True,
                      render_kwargs=dict(display_size=(w, h), fullscreen=True))
 
-    time_delay = 0.1
+    time_delay = 0.0
     n_delay_steps = int(round(time_delay * framerate))
     task = TimeDelayWrapper(task, n_delay_steps)
 
-    # Run all trials
-    while n < n_trials:
-        p_pointer = np.array(pygame.mouse.get_pos())
-        success, target_pos, target_size = task.step(p_pointer)
-        if success:
-            n += 1
-        clock.tick(framerate)
+    # Track the trial
+    trial = Trial(framerate=framerate, delay_secs=delay_secs, n_trials=1)
+    trial.run(task, lambda: np.array(pygame.mouse.get_pos()))
+    trial.save("../trials/test1.pkl")
 
-    task.exit()
+    # Relevant files
+    pyfiles_path = os.path.join("../trials", "pyfiles")
+    os.makedirs(pyfiles_path, exist_ok=True)
+    for f in os.listdir("../src"):
+        dest = os.path.join(pyfiles_path, os.path.basename(f))
+        copyfile(__file__, dest)
 
 
 if __name__ == "__main__":

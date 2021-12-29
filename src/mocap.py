@@ -1,6 +1,7 @@
 #!/home/tucker/anaconda3/bin/python3
 import sys
 
+import dill
 import numpy as np
 import pygame
 import quaternion
@@ -9,65 +10,24 @@ import rospy
 sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
 
 from geometry_msgs.msg import PoseArray
-from util import is_pygame_running, render_lines_of_text, pygame_get_screenres
-from task import FittsTask
+from util import is_pygame_running, render_lines_of_text
 
 
-class FittsMocap:
-    def __init__(self, n_trials=20, frame_rate=60, calib_secs=5, delay_secs=1, task_args=None, task_kwargs=None):
+class MocapTracker:
+    def __init__(self):
+        # Set up ROS
         rospy.init_node('read_polaris', anonymous=True)
         rospy.Subscriber("polaris_sensor/targets", PoseArray, self.polaris_callback, queue_size=1)
 
+        # Data tracking and control flow
         self.collect_data = False
         self.marker_visible = False
 
+        # Calibration
         self.is_calibrate = True
-        self.n_trials = n_trials
-
-        self.framerate = frame_rate
-        self.calib_secs = calib_secs
-        self.delay_secs = delay_secs
-
-        self.cb_pt = np.nan
-        self.cb_q = np.nan
-
-        self.T = None
-
-        self.task_args = task_args
-        self.task_kwargs = task_kwargs
-        if task_args is None:
-            self.task_args = (((0, 0.37), (0, 0.23)), (0.01, 0.02), (0.01, 0.12), 0.01)
-
-        if task_kwargs is None:
-            self.task_kwargs = dict(steps_to_wait=int(self.delay_secs * self.framerate),
-                                    stationary_tolerance=0.005,
-                                    render=True,
-                                    render_kwargs=dict(display_size=pygame_get_screenres(), fullscreen=True))
-
-        self.task = None
-
-    def run(self):
-        self.calibrate()
-        clock = pygame.time.Clock()
-
-        # self.task = FittsTask(*self.task_args, **self.task_kwargs)
-        self.task = FittsTask(**dict(workspace_lims=((0, 0.5300869565118), (0, 0.298173902)),
-                                     target_size_lims=(0.01, 0.02),
-                                     home_pos=(0.5300869565118/2, 0.298173902/2),
-                                     home_size=0.01,
-                                     steps_to_wait=int(self.delay_secs * self.framerate),
-                                     stationary_tolerance=0.005,
-                                     render=True,
-                                     render_kwargs=dict(display_size=pygame_get_screenres(), fullscreen=True)))
-
-        n = 0
-        while n < self.n_trials:
-            p_pointer = self.get_mocap_pt()
-            # print(p_pointer)
-            success, target_pos, target_size = self.task.step(p_pointer)
-            if success:
-                n += 1
-            clock.tick(self.framerate)
+        self.cb_pt = np.nan  # Calibration point
+        self.cb_q = np.nan  # Calibration quaternion
+        self.T = None  # Computed transformation matrix from calibration
 
     def get_mocap_pt(self):
         if not np.any(np.isnan(self.cb_pt)):
@@ -117,11 +77,11 @@ class FittsMocap:
                 return False
 
         pygame.quit()
-        self.T = self.make_transformation_matrix(calib_pts, calib_qs)
+        self._make_transformation_matrix(calib_pts, calib_qs)
 
         return True
 
-    def make_transformation_matrix(self, calib_pts, calib_qs):
+    def _make_transformation_matrix(self, calib_pts, calib_qs):
         # Construct the transformation matrix
         ws_origin = np.mean(np.array(calib_pts), axis=0)
         ws_q = np.quaternion(np.mean(np.array(calib_qs)))
@@ -135,8 +95,7 @@ class FittsMocap:
         T[:3, :3] = rot_mat
         T[:3, 3] = np.matmul(rot_mat, -ws_origin[:3])
         T[3, 3] = 1
-        print(T)
-        return T
+        self.T = T
 
     def polaris_callback(self, pose_array):
         pos = pose_array.poses[0].position
@@ -146,7 +105,8 @@ class FittsMocap:
         self.cb_pt = position
         self.cb_q = orientation
 
+    def save(self, fn):
+        with open(fn, "wb") as f:
+            dill.dump(self, fn)
 
-if __name__ == "__main__":
-    task = FittsMocap()
-    task.run()
+

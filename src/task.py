@@ -7,6 +7,7 @@ from typing import Tuple
 from viewer import FittsTaskViewer
 from collections import deque
 
+
 class FittsTask:
     def __init__(self,
                  workspace_lims: Tuple[Tuple[float, ...], ...],
@@ -65,7 +66,7 @@ class FittsTask:
         self.render_kwargs = render_kwargs
         self.try_render()
 
-    def step(self, p_pointer: np.ndarray) -> Tuple[bool, Tuple[float, ...], float]:
+    def step(self, p_pointer: np.ndarray) -> Tuple[bool, bool, Tuple[float, ...], float]:
         if p_pointer is None:
             return False, self.target_pos, self.target_size
 
@@ -92,7 +93,7 @@ class FittsTask:
                     upper_lim = self.workspace_lims[:, 1] - self.target_size
                     self.target_pos = np.random.uniform(lower_lim, upper_lim, 2)
 
-        return success, self.target_pos, self.target_size
+        return self.is_home_state, success, self.target_pos, self.target_size
 
     def try_render(self):
         if self.render and not self.viewer:
@@ -105,10 +106,12 @@ class FittsTask:
             setattr(self, "viewer", None)
             dill.dump(self, pkl_file)
 
+    def remove_viewer(self):
+        self.viewer = None
+
     def exit(self):
         if self.viewer:
             self.viewer.exit()
-        sys.exit(0)
 
     def _pointer_in_circle(self):
         distance = np.linalg.norm(self.pointer_pts[-1] - self.target_pos)
@@ -121,7 +124,8 @@ class FittsTask:
         in_tol = [np.all(np.abs(pts[:, i] - np.mean(pts[:, i])) < self.stationary_tolerance) for i in range(self.ndim)]
         return np.all(in_tol)
 
-    def _validate_inputs(self, workspace_lims, home_pos, target_size_lims):
+    @staticmethod
+    def _validate_inputs(workspace_lims, home_pos, target_size_lims):
         if not (0 < len(workspace_lims) < 3):
             raise ValueError("Workspace should be 1D, 2D, or 3D")
         if len(workspace_lims) != len(home_pos):
@@ -144,19 +148,29 @@ class TaskWrapper:
     def __getattr__(self, item):
         return self.task.__getattribute__(item)
 
+    def remove_viewer(self):
+        self.task.viewer = None
+
 
 class TimeDelayWrapper(TaskWrapper):
     def __init__(self, task, delay_steps):
         super().__init__(task)
-        self.delay_buffer = deque(maxlen=delay_steps)
-        for _ in range(delay_steps):
-            self.delay_buffer.append(np.array([0, 0]))
+        if delay_steps == 0:
+            self.delay_buffer = None
+        else:
+            self.delay_buffer = deque(maxlen=delay_steps)
+            for _ in range(delay_steps):
+                self.delay_buffer.append(np.array([0, 0]))
 
-    def step(self, p_pointer: np.ndarray) -> Tuple[bool, Tuple[float, ...], float]:
-        pt = self.delay_buffer.pop()
+    def step(self, p_pointer: np.ndarray) -> Tuple[bool, bool, Tuple[float, ...], float]:
+        if self.delay_buffer:
+            pt = self.delay_buffer.pop()
+            self.delay_buffer.appendleft(p_pointer)
+        else:
+            pt = p_pointer
         ret = self.task.step(pt)
-        self.delay_buffer.appendleft(p_pointer)
         return ret
+
 
 
 

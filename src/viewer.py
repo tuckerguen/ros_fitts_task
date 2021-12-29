@@ -81,5 +81,6 @@ class FittsTaskViewer:
         pygame.font.init()
         self.pg_clock = pygame.time.Clock()
 
-    def exit(self):
+    @staticmethod
+    def exit():
         pygame.quit()
