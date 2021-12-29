@@ -5,7 +5,7 @@ import numpy as np
 from enum import Enum
 from typing import Tuple
 from viewer import FittsTaskViewer
-
+from collections import deque
 
 class FittsTask:
     def __init__(self,
@@ -65,7 +65,10 @@ class FittsTask:
         self.render_kwargs = render_kwargs
         self.try_render()
 
-    def step(self, p_pointer: np.ndarray) -> Tuple[bool, np.ndarray, float]:
+    def step(self, p_pointer: np.ndarray) -> Tuple[bool, Tuple[float, ...], float]:
+        if p_pointer is None:
+            return False, self.target_pos, self.target_size
+
         self.pointer_pts.append(p_pointer)
         self.try_render()
 
@@ -84,7 +87,7 @@ class FittsTask:
                 else:
                     # Set the circle to a new random point
                     self.target_size = np.random.uniform(self.target_size_lims[0], self.target_size_lims[1], 1)[0]
-                    # Avoid off screen points
+                    # Avoid off-screen points
                     lower_lim = self.workspace_lims[:, 0] + self.target_size
                     upper_lim = self.workspace_lims[:, 1] - self.target_size
                     self.target_pos = np.random.uniform(lower_lim, upper_lim, 2)
@@ -135,5 +138,17 @@ def from_pickle(f):
 
 
 class TimeDelayWrapper:
-    def __init__(self, task, delay):
+    def __init__(self, task, delay_steps):
+        self.delay_buffer = deque(maxlen=delay_steps)
+        for _ in range(delay_steps):
+            self.delay_buffer.append(np.array([0, 0]))
+        self.task = task
+
+    def step(self, p_pointer: np.ndarray) -> Tuple[bool, Tuple[float, ...], float]:
+        pt = self.delay_buffer.pop()
+        ret = self.task.step(pt)
+        self.delay_buffer.appendleft(p_pointer)
+        return ret
+
+
 

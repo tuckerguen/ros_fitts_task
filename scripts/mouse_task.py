@@ -1,7 +1,6 @@
-import pickle
 import numpy as np
 import pygame
-from task import FittsTask, from_pickle
+from task import FittsTask, TimeDelayWrapper
 from util import pygame_get_screenres
 
 
@@ -21,6 +20,10 @@ def main():
                      steps_to_wait=int(delay_secs * framerate),
                      render=True,
                      render_kwargs=dict(display_size=(w, h), fullscreen=True))
+
+    time_delay = 0.5
+    n_delay_steps = int(round(time_delay * framerate))
+    task = TimeDelayWrapper(task, n_delay_steps)
 
     # Run all trials
     while n < n_trials:
