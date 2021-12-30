@@ -1,3 +1,5 @@
+#!/home/tucker/anaconda3/bin/python3
+
 import os
 from shutil import copyfile
 import pygame

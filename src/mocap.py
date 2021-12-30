@@ -20,7 +20,7 @@ class MocapTracker:
         rospy.init_node('read_polaris', anonymous=True)
         rospy.Subscriber("polaris_sensor/targets", PoseArray, self.polaris_callback, queue_size=1)
 
-        self.bag = rosbag.Bag(bag_path)
+        self.bag = rosbag.Bag(bag_path, "w")
 
         # Data tracking and control flow
         self.collect_data = False
@@ -37,7 +37,9 @@ class MocapTracker:
 
     def get_mocap_pt(self):
         if not np.any(np.isnan(self.cb_pt)):
-            return np.matmul(self.T, self.cb_pt)[1:3]
+            pt = np.matmul(self.T, self.cb_pt)[1:3]
+            pt = pt[::-1]
+            return pt
         else:
             return None
 
@@ -115,6 +117,6 @@ class MocapTracker:
 
     def save(self, fn):
         with open(fn, "wb") as f:
-            dill.dump(self, fn)
+            dill.dump(self, f)
 
 

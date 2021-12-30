@@ -28,11 +28,11 @@ def pygame_get_screenres():
     return w, h
 
 
-def plt_config_for_screen():
-    w, h = pygame_get_screenres()
-    plt.ylim((0, h))
+def plt_config_lims(xlim, ylim):
+    # w, h = pygame_get_screenres()
+    plt.ylim((0, ylim))
     plt.gca().invert_yaxis()
-    plt.xlim((0, w))
+    plt.xlim((0, xlim))
 
 
 def render_lines_of_text(screen, text_lines, font='Arial', text_height=30, line_gap=5, color=(255,255,255)):
@@ -81,7 +81,9 @@ class Trajectory:
     def plot2d(self):
         _, pts = self.to_numpy()
         plt.scatter(pts[:, 0], pts[:, 1])
-        plt_config_for_screen()
+        WS_WIDTH = 0.5300869565118
+        WS_HEIGHT = 0.298173902
+        plt_config_lims(WS_WIDTH, WS_HEIGHT)
         plt.show()
 
     def replay(self):
@@ -162,7 +164,9 @@ class Trial:
         for traj in self.trajectories:
             _, pts = traj.to_numpy()
             plt.plot(pts[:, 0], pts[:, 1])
-        plt_config_for_screen()
+        WS_WIDTH = 0.5300869565118
+        WS_HEIGHT = 0.298173902
+        plt_config_lims(WS_WIDTH, WS_HEIGHT)
         plt.show()
 
     def plot_ith(self, i):

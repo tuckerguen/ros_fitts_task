@@ -57,6 +57,7 @@ class FittsTask:
         self.target_size_lims = target_size_lims
 
         self.steps_to_wait = steps_to_wait
+        self.target_wait = steps_to_wait
         self.stationary_tolerance = stationary_tolerance
 
         self.pointer_pts = []
@@ -68,7 +69,7 @@ class FittsTask:
 
     def step(self, p_pointer: np.ndarray) -> Tuple[bool, bool, Tuple[float, ...], float]:
         if p_pointer is None:
-            return False, self.target_pos, self.target_size
+            return True, False, self.target_pos, self.target_size
 
         self.pointer_pts.append(p_pointer)
         self.try_render()
@@ -85,6 +86,7 @@ class FittsTask:
                     self.target_pos = self.home_pos
                     self.target_size = self.home_size
                     success = True
+                    self.steps_to_wait = np.random.randint(10, 50, 1)[0]
                 else:
                     # Set the circle to a new random point
                     self.target_size = np.random.uniform(self.target_size_lims[0], self.target_size_lims[1], 1)[0]
@@ -92,6 +94,7 @@ class FittsTask:
                     lower_lim = self.workspace_lims[:, 0] + self.target_size
                     upper_lim = self.workspace_lims[:, 1] - self.target_size
                     self.target_pos = np.random.uniform(lower_lim, upper_lim, 2)
+                    self.steps_to_wait = self.target_wait
 
         return self.is_home_state, success, self.target_pos, self.target_size
 
@@ -132,7 +135,7 @@ class FittsTask:
             raise ValueError("Home position must have same dimensionality as workspace")
         if len(target_size_lims) != 2:
             raise ValueError("Target size limits must be a tuple, (min, max)")
-        if target_size_lims[0] >= target_size_lims[1]:
+        if target_size_lims[0] > target_size_lims[1]:
             raise ValueError("First target size must be smaller than second target size")
 
 
