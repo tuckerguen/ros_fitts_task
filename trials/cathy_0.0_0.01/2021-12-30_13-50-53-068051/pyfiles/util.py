@@ -96,12 +96,9 @@ class Trajectory:
         pygame.quit()
 
     def pygame_draw(self, screen, clock, dt, speed=1):
-        fw = 1920/0.5300869565118
-        fh = 1080/0.298173902
-
         for tp in self.timepoints:
             pygame.draw.circle(screen, (0, 0, 255), self.cpos, self.crad, 0)
-            pygame.draw.circle(screen, (255, 255, 255), (tp.pt[0]*fw, tp.pt[1]*fh), 5, 0)
+            pygame.draw.circle(screen, (255, 255, 255), (tp.pt[0], tp.pt[1]), 5, 0)
             pygame.display.flip()
             pygame.display.update()
             clock.tick(int(1 / dt) * speed)

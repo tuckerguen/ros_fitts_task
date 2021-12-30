@@ -20,9 +20,9 @@ if __name__ == "__main__":
     WS_HEIGHT = 0.298173902
     TGSIZE = 0.01
 
-    td = 0.1
+    td = 0.0
     delay_steps = int(60 * td)
-    username = f"{username}_{td:0.2f}_{TGSIZE:.3f}"
+    username = username + "_" + str(td) + "_" + str(TGSIZE)
 
     # Trial tracking info
     rospack = rospkg.RosPack()

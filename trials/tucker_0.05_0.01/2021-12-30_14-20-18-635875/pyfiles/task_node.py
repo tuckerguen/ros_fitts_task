@@ -11,7 +11,7 @@ from util import pygame_get_screenres, Trial, Timepoint, Trajectory
 
 if __name__ == "__main__":
     # CONFIG
-    username = "cathy"
+    username = "tucker"
     framerate = 60
     delay_secs = 0.5
     n_trials = 100
@@ -20,9 +20,9 @@ if __name__ == "__main__":
     WS_HEIGHT = 0.298173902
     TGSIZE = 0.01
 
-    td = 0.1
+    td = 0.05
     delay_steps = int(60 * td)
-    username = f"{username}_{td:0.2f}_{TGSIZE:.3f}"
+    username = username + "_" + str(td) + "_" + str(TGSIZE)
 
     # Trial tracking info
     rospack = rospkg.RosPack()

@@ -18,11 +18,11 @@ if __name__ == "__main__":
     calib_secs = 5
     WS_WIDTH = 0.5300869565118
     WS_HEIGHT = 0.298173902
-    TGSIZE = 0.01
+    TGSIZE = 0.001
 
-    td = 0.1
+    td = 0.0
     delay_steps = int(60 * td)
-    username = f"{username}_{td:0.2f}_{TGSIZE:.3f}"
+    username = username + "_" + str(td) + "_" + str(TGSIZE)
 
     # Trial tracking info
     rospack = rospkg.RosPack()
