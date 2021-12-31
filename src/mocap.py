@@ -35,6 +35,13 @@ class MocapTracker:
         # Default framerate, doesn't matter during calibration
         self.framerate = 60
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.bag.close()
+        return True
+
     def get_mocap_pt(self):
         if not np.any(np.isnan(self.cb_pt)):
             pt = np.matmul(self.T, self.cb_pt)[1:3]

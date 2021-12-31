@@ -100,7 +100,8 @@ class Trajectory:
         fh = 1080/0.298173902
 
         for tp in self.timepoints:
-            pygame.draw.circle(screen, (0, 0, 255), self.cpos, self.crad, 0)
+            size_scl = 1080 / 0.298173902
+            pygame.draw.circle(screen, (0, 0, 255), (self.cpos[0]*fw, self.cpos[1]*fh), self.crad*size_scl, 0)
             pygame.draw.circle(screen, (255, 255, 255), (tp.pt[0]*fw, tp.pt[1]*fh), 5, 0)
             pygame.display.flip()
             pygame.display.update()
@@ -180,7 +181,7 @@ class Trial:
 
     def replay(self, speed=1):
         pygame.init()
-        screen = pygame.display.set_mode((0, 0), pygame.WINDOWMINIMIZED)
+        screen = pygame.display.set_mode((1920, 1080))
         screen.fill((0, 0, 0))
         clock = pygame.time.Clock()
         dt = self.trajectories[0].timepoints[1].t - self.trajectories[0].timepoints[0].t
