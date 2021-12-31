@@ -10,7 +10,7 @@ import rosbag
 
 sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
 
-from geometry_msgs.msg import PoseArray
+# from geometry_msgs.msg import PoseArray
 from util import is_pygame_running, render_lines_of_text
 
 

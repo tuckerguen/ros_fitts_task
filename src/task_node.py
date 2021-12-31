@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import time
 import rospkg
 from shutil import copyfile
@@ -63,6 +64,8 @@ if __name__ == "__main__":
         # rosbag
         # Mocap tracker
         mocap.save(os.path.join(target_dir, "mocap.pkl"))
+        # Mocap calibration matrix
+        np.save(os.path.join(target_dir, "T.npy"), mocap.T)
         # Organized Trial and Trajectories data
         trial.save(os.path.join(target_dir, "trial.pkl"))
         # Save task
