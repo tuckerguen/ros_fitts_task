@@ -1,5 +1,6 @@
 #!/home/tucker/anaconda3/bin/python3
 import sys
+import os
 
 import dill
 import numpy as np
@@ -10,7 +11,7 @@ import rosbag
 
 sys.path.append('/home/tucker/thesis/ros_workspace/src/fitts_task/scripts')
 
-# from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import PoseArray
 from util import is_pygame_running, render_lines_of_text
 
 
@@ -123,6 +124,10 @@ class MocapTracker:
         self.cb_q = orientation
 
     def save(self, fn):
+        # indepentently save the T matrix
+        # Avoids conflicts with rosbag when loading this object from pickle
+        np.save(os.path.join(os.path.dirname(fn), "T.npy"), self.T)
+
         with open(fn, "wb") as f:
             dill.dump(self, f)
 

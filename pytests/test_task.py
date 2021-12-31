@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-
+import sys
+sys.path.append(r"C:\School\thesis\ros_fitts_task\src")
 from task import FittsTask
 
 
@@ -17,9 +18,6 @@ class TestFittsTask(unittest.TestCase):
                               home_size=self.home_size,
                               steps_to_wait=self.steps_to_wait,
                               render=False)
-
-    # def test_PointerInCircle(self):
-
 
     def test_AllPtsClose_OutlierOutsideWaitRange(self):
         self.task.pointer_pts = [np.array([0, 0])] * (self.steps_to_wait + 10)

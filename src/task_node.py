@@ -1,14 +1,15 @@
 import os
-import numpy as np
 import time
 import rospkg
 from shutil import copyfile
 import sys
-sys.path.append("/home/tucker/thesis/ros_workspace/src/fitts_task/src")
+
 from datetime import datetime
 from task import FittsTask, TimeDelayWrapper
 from mocap import MocapTracker
-from util import pygame_get_screenres, Trial, Timepoint, Trajectory
+from util import pygame_get_screenres, Trial
+
+sys.path.append("/home/tucker/thesis/ros_workspace/src/fitts_task/src")
 
 if __name__ == "__main__":
     # CONFIG
@@ -61,11 +62,8 @@ if __name__ == "__main__":
         task_end_time = time.process_time() - t0
 
         # SAVE
-        # rosbag
         # Mocap tracker
         mocap.save(os.path.join(target_dir, "mocap.pkl"))
-        # Mocap calibration matrix
-        np.save(os.path.join(target_dir, "T.npy"), mocap.T)
         # Organized Trial and Trajectories data
         trial.save(os.path.join(target_dir, "trial.pkl"))
         # Save task
@@ -87,5 +85,3 @@ if __name__ == "__main__":
             if f.endswith(".py"):
                 dest = os.path.join(pyfiles_path, f)
                 copyfile(os.path.join(src_path, f), dest)
-
-
