@@ -22,7 +22,7 @@ if __name__ == "__main__":
     calib_secs = 5
     WS_WIDTH = 0.5300869565118
     WS_HEIGHT = 0.298173902
-    TGSIZE = 0.01
+    TGSIZE = 0.001
 
     td = 0.2
     delay_steps = int(60 * td)
