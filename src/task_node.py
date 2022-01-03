@@ -18,13 +18,13 @@ if __name__ == "__main__":
     username = "tucker"
     framerate = 60
     delay_secs = 0.5
-    n_trials = 50
+    n_trials = 200
     calib_secs = 5
     WS_WIDTH = 0.5300869565118
     WS_HEIGHT = 0.298173902
     TGSIZE = 0.001
 
-    td = 0.3
+    td = 0.0
     delay_steps = int(60 * td)
     username = f"{username}_{td:0.2f}_{TGSIZE:.3f}"
 
