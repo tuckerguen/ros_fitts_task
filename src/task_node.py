@@ -9,8 +9,9 @@ from shutil import copyfile
 import rospkg
 
 from mocap import MocapTracker
-from task import FittsTask, TimeDelayWrapper
-from util import pygame_get_screenres, Trial
+from fitts.task import FittsTask, TimeDelayWrapper
+from fitts.util import pygame_get_screenres
+from fitts.trial import Trial
 
 
 if __name__ == "__main__":

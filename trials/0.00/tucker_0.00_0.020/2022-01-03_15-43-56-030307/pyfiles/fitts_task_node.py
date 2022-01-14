@@ -292,7 +292,6 @@ class FittsTaskNode:
                 # self.delay_timer = time.perf_counter()
 
 
-
 def main():
     # node = FittsTaskNode(screen_size=(0.6858, 0.3556))  # Big monitor (27")
     # node = FittsTaskNode(screen_size=(0.505, 0.2805))  # Small monitor (21.5")

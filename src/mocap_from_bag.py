@@ -2,12 +2,11 @@
 
 import os
 import numpy as np
-import dill
 import rosbag
 import sys
 sys.path.append("/home/tucker/thesis/ros_workspace/src/fitts_task/src")
-from task import FittsTask
-from util import Trial
+from fitts.task import FittsTask
+from fitts.trial import Trial
 
 if __name__ == "__main__":
     # CONFIG
