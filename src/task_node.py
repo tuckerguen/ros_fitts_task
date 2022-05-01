@@ -1,6 +1,9 @@
+"""
+Primary file for collecting human trial data
+"""
+
 import os
 import sys
-sys.path.append("/home/tucker/thesis/ros_workspace/src/fitts_task/src")
 
 import time
 from datetime import datetime

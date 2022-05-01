@@ -4,7 +4,6 @@ import os
 import numpy as np
 import rosbag
 import sys
-sys.path.append("/home/tucker/thesis/ros_workspace/src/fitts_task/src")
 from fitts.task import FittsTask
 from fitts.trial import Trial
 
@@ -17,10 +16,11 @@ if __name__ == "__main__":
     WS_WIDTH = 0.5300869565118
     WS_HEIGHT = 0.298173902
     TGSIZE = 0.01
-    base = "C:/School/thesis/ros_fitts_task/trials"
-    ts = "2021-12-29_16-07-16-689049"
-    traj_path = [os.path.join(base, f, f2) for f in os.listdir(base) for f2 in os.listdir(os.path.join(base, f)) if
-                 f2 == ts][0]
+    bag_base_dir = ""
+    rosbag_timestamp = "2021-12-29_16-07-16-689049"
+    traj_path = [os.path.join(bag_base_dir, f, f2) for f in os.listdir(bag_base_dir)
+                 for f2 in os.listdir(os.path.join(bag_base_dir, f)) if
+                 f2 == rosbag_timestamp][0]
 
     # Create the fitts task
     # NOTE: When using a viewer, create the FittsTask after performing
@@ -43,6 +43,9 @@ if __name__ == "__main__":
     T = np.load(os.path.join(traj_path, "T.npy"))
 
     def msg_func():
+        """
+        Extract messages 1 by 1 from the rosbag
+        """
         p = next(msg_gen).message.poses[0].position
         pt = np.array([p.x, p.y, p.z, 1])
         if not np.any(np.isnan(pt)):
