@@ -1,4 +1,9 @@
 # ROS Motion Capture Fitts Task
-Runs a fitts task using input from a ROS node that reads data from a Polaris Vicra motion capture sensor.
+ROS package that can be used in conjunction with the 
+[polaris_sensor package](https://github.com/tuckeruen/polaris_sensor). You can use the instructions there
+to run that node and stream data from the Polaris Vicra to a ROS topic. Make sure to use the correct rom file. For this
+project: ***rom/fitts_tool.rom***  
 
-The main running file is *task_node.py*
+Then run this node to perform the actual human trial data collection.  
+
+The main file is *task_node.py*
